@@ -1,0 +1,2096 @@
+<!DOCTYPE html>                  
+<html lang="ko">                  
+<head>                  
+    <link class="icon-png" rel="icon" href="/IMG_6116.PNG" type="image/png">                  
+    <link rel="apple-touch-icon" href="/IMG_6116.PNG">                  
+    <link class="icon-png-dup" rel="icon" href="/IMG_6116.PNG" type="image/png">                  
+    <meta charset="UTF-8">                  
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">                  
+    <title>메모RE</title>                  
+    <!-- Tailwind CSS -->                  
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-app.js";
+        import { getAuth, onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-auth.js";
+        import { getFirestore, doc, getDoc, setDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-firestore.js";
+
+        // Web Square에서 사용한 Firebase 프로젝트를 그대로 사용. apiKey만 Firebase 콘솔의 웹 앱 설정값으로 넣으면 된다.
+        const firebaseConfig = {
+            apiKey: "AIzaSyB-WwobnLJ6pG2uvvk1YoGnQcuexA4jzq4",
+            authDomain: "memore-b19c2.firebaseapp.com",
+            projectId: "memore-b19c2",
+            storageBucket: "memore-b19c2.firebasestorage.app",
+            messagingSenderId: "286253732795",
+            appId: "1:286253732795:web:e26416c2094696cbde2a9e",
+            measurementId: "G-7Q69JMJ3Y0"
+        };
+
+        let firebaseReady = false;
+        let firebaseAuth = null;
+        let firebaseDb = null;
+        let firebaseUser = null;
+
+        try {
+            if (firebaseConfig.apiKey && !firebaseConfig.apiKey.includes("PASTE_YOUR")) {
+                const firebaseApp = initializeApp(firebaseConfig);
+                firebaseAuth = getAuth(firebaseApp);
+                firebaseDb = getFirestore(firebaseApp);
+                firebaseReady = true;
+                window.firebaseMemoRE = {
+                    signUp: async (email, password) => createUserWithEmailAndPassword(firebaseAuth, email, password),
+                    signIn: async (email, password) => signInWithEmailAndPassword(firebaseAuth, email, password),
+                    signOut: async () => signOut(firebaseAuth),
+                    save: async () => {
+                        if (!firebaseUser) throw new Error("로그인이 필요합니다.");
+                        const ref = doc(firebaseDb, "memoreUsers", firebaseUser.uid);
+                        await setDoc(ref, { appData: window.appData, studySessions: window.studySessions, updatedAt: serverTimestamp() }, { merge: false });
+                    },
+                    load: async () => {
+                        if (!firebaseUser) throw new Error("로그인이 필요합니다.");
+                        const snap = await getDoc(doc(firebaseDb, "memoreUsers", firebaseUser.uid));
+                        return snap.exists() ? snap.data() : null;
+                    },
+                    getUser: () => firebaseUser
+                };
+                onAuthStateChanged(firebaseAuth, user => {
+                    firebaseUser = user;
+                    window.updateFirebaseUI?.();
+                });
+            }
+        } catch (e) { console.warn("Firebase init failed", e); }
+        window.firebaseMemoREState = () => ({ ready: firebaseReady, user: firebaseUser });
+    </script>                  
+    <style>                  
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght=300;400;500;700&display=swap');                  
+        body {                  
+            font-family: 'Noto Sans KR', -apple-system, BlinkMacSystemFont, sans-serif;                  
+                  
+        /* ==================== 팝업 모달 다이나믹 테마 동기화 엔진 (기기 라이트/다크모드 영향 배제) ==================== */                  
+        .app-modal-content {                  
+            transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;                  
+        }                  
+        /* 화이트 모달 */                  
+        body.theme-white .app-modal-content {                  
+            background-color: #ffffff;                  
+            color: #111111;                  
+            border-color: #e5e7eb;                  
+        }                  
+        /* 다크 모달 */                  
+        body.theme-dark .app-modal-content {                  
+            background-color: #262626;                  
+            color: #e5e5e5;                  
+            border-color: #404040;                  
+        }                  
+        /* 아이보리 모달 */                  
+        body.theme-ivory .app-modal-content {                  
+            background-color: #fcfbfa;                  
+            color: #2b2927;                  
+            border-color: #d1cbbe;                  
+        }                  
+        /* 루리드래곤 모달 */                  
+        body.theme-ruri .app-modal-content {                  
+            background-color: #ffffff;                  
+            color: #2b4c59;                  
+            border-color: #a3c2ce;                  
+        }                  
+                  
+        /* 인풋창 다이나믹 테마 동기화 */                  
+        .app-input {                  
+            transition: background-color 0.3s, border-color 0.3s, color 0.3s;                  
+        }                  
+        body.theme-white .app-input,                  
+        body.theme-ruri .app-input {                  
+            background-color: #ffffff;                  
+            color: #111111;                  
+            border-color: #d1d5db;                  
+        }                  
+        body.theme-dark .app-input {                  
+            background-color: #1a1a1a;                  
+            color: #e5e5e5;                  
+            border-color: #404040;                  
+        }                  
+        body.theme-ivory .app-input {                  
+            background-color: #f7f4eb;                  
+            color: #2b2927;                  
+            border-color: #d1cbbe;                  
+        }                  
+                  
+        /* 모달 하단 버튼 테마 제어 */                  
+        .app-modal-btn-cancel {                  
+            transition: all 0.2s;                  
+            border-width: 1px;                  
+        }                  
+        body.theme-white .app-modal-btn-cancel,                  
+        body.theme-ruri .app-modal-btn-cancel {                  
+            background-color: #f3f4f6;                  
+            color: #374151;                  
+            border-color: #d1d5db;                  
+        }                  
+        body.theme-dark .app-modal-btn-cancel {                  
+            background-color: #373737;                  
+            color: #e5e5e5;                  
+            border-color: #4b5563;                  
+        }                  
+        body.theme-ivory .app-modal-btn-cancel {                  
+            background-color: #eae6db;                  
+            color: #4b5563;                  
+            border-color: #d1cbbe;                  
+        }                  
+                  
+        .app-modal-btn-confirm {                  
+            transition: all 0.2s;                  
+        }                  
+        body.theme-white .app-modal-btn-confirm,                  
+        body.theme-ruri .app-modal-btn-confirm {                  
+            background-color: #111827;                  
+            color: #ffffff;                  
+        }                  
+        body.theme-dark .app-modal-btn-confirm {                  
+            background-color: #f3f4f6;                  
+            color: #111827;                  
+        }                  
+        body.theme-ivory .app-modal-btn-confirm {                  
+            background-color: #2b2927;                  
+            color: #f7f4eb;                  
+        }                  
+    
+        /* ==================== Apple-style app UI ==================== */
+        :root { color-scheme: light; }
+        body { font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Noto Sans KR",sans-serif; background:#f5f5f7; color:#1d1d1f; }
+        body.theme-dark { background:#f5f5f7; color:#1d1d1f; }
+        body.theme-ivory { background:#f7f6f2; color:#1d1d1f; }
+        header { background:#ffffff!important; border-color:#e5e5ea!important; box-shadow:0 1px 0 rgba(0,0,0,.04); backdrop-filter:none!important; -webkit-backdrop-filter:none!important; }
+        main { max-width:720px!important; }
+        section > div, .app-card-bg, .drag-item { border-color:#e5e5ea!important; border-radius:18px!important; }
+        .drag-item { background:#ffffff!important; box-shadow:0 2px 10px rgba(0,0,0,.04)!important; }
+        body.theme-dark .drag-item { background:#ffffff!important; border-color:#e5e5ea!important; color:#1d1d1f!important; }
+        button { -webkit-tap-highlight-color:transparent; cursor:pointer; touch-action:manipulation; }
+        button:disabled { cursor:default; opacity:.45; }
+        button:not(.pointer-events-none) { pointer-events:auto; }
+        input, textarea, select { border-radius:12px!important; }
+        .app-input { background:#ffffff!important; color:#1d1d1f!important; border:1px solid #d2d2d7!important; padding:.7rem .8rem!important; box-shadow:inset 0 1px 1px rgba(0,0,0,.02); }
+        .app-input:focus { outline:none!important; border-color:#0071e3!important; box-shadow:0 0 0 3px rgba(0,113,227,.14)!important; }
+        .app-modal-content { background:#ffffff!important; color:#1d1d1f!important; border:1px solid #e5e5ea!important; border-radius:20px!important; box-shadow:0 18px 50px rgba(0,0,0,.16)!important; }
+        .app-modal-btn-confirm { background:#1d1d1f!important; color:#fff!important; border-radius:12px!important; min-height:40px; }
+        .app-modal-btn-cancel { background:#f2f2f7!important; color:#1d1d1f!important; border:1px solid #d2d2d7!important; border-radius:12px!important; min-height:40px; }
+        footer { border-color:#e5e5ea!important; }
+        #modal-sync,#modal-theme,#modal-account,#modal-folder-add,#modal-set-add,#modal-rename,#modal-delete-confirm { background:rgba(0,0,0,.28)!important; }
+        #sync-main-btn,#account-main-btn,#theme-btn,#back-btn { background:#fff!important; color:#1d1d1f!important; border-color:#d2d2d7!important; min-height:34px; }
+        #sync-main-btn:hover,#account-main-btn:hover,#theme-btn:hover,#back-btn:hover { background:#f2f2f7!important; opacity:1!important; }
+        .text-red-500 { color:#ff3b30!important; }
+        .bg-neutral-950 { background:#1d1d1f!important; }
+
+    </style>                  
+</head>                  
+<body class="min-h-screen flex flex-col justify-between selection:bg-neutral-800 theme-white">                  
+                  
+    <!-- 상단 헤더 -->                  
+    <header class="border-b border-neutral-200 py-4 px-6 sticky top-0 bg-inherit z-50 transition-colors">                  
+        <div class="max-w-md mx-auto flex items-center justify-between">                  
+            <!-- 로고 영역 -->                  
+            <button onclick="goHome()" id="header-logo-container" class="flex items-center justify-start hover:opacity-70 transition-opacity">                  
+                <span id="header-text-logo" class="text-xl font-bold tracking-widest">메모RE</span>
+</button>                  
+            <div class="flex items-center gap-2">                  
+                <!-- 실시간 동기화/백업 상태 표시등 버튼 -->                  
+                <button onclick="toggleSyncModal()" id="sync-main-btn" class="flex items-center justify-center border border-neutral-300 rounded hover:opacity-80 transition-all" title="동기화">                  
+                      
+                    <span id="sync-status-indicator" class="w-3.5 h-3.5 rounded-full bg-neutral-300 border border-white transition-all duration-300" title="데이터 백업 및 복원"></span>                  
+                      
+                </button>                  
+                <button onclick="toggleAccountModal()" id="account-main-btn" class="h-8 px-2.5 flex items-center justify-center border border-neutral-300 rounded text-[11px] font-medium hover:opacity-80 transition-all" title="계정">계정</button>
+                <!-- 테마 설정 버튼 -->                  
+                <button id="theme-btn" onclick="toggleThemeModal()" class="w-8 h-8 flex items-center justify-center border border-neutral-300 rounded overflow-hidden hover:opacity-80 transition-all" title="테마 변경">                  
+                    <span id="theme-btn-color" class="w-5 h-5 rounded-full border border-neutral-400 bg-cover bg-center transition-all"></span>                  
+                </button>                  
+                  
+                <button id="back-btn" onclick="goBack()" class="hidden px-2.5 py-1 text-xs border border-neutral-300 rounded hover:opacity-80 transition-colors">                  
+                    &lt;--                  
+                </button>                  
+            </div>                  
+        </div>                  
+    </header>                  
+                  
+    <!-- 메인 컨텐츠 영역 -->                  
+    <main class="flex-grow w-full max-w-md mx-auto px-5 py-6">                  
+                  
+        <!-- [1] 홈 화면: 폴더 목록 -->                  
+        <section id="view-home" class="space-y-6">                  
+            <div class="flex justify-between items-center">                  
+                <div class="flex items-center gap-2">                  
+                    <h2 class="text-sm tracking-wider opacity-60 font-medium">폴더 목록</h2>                  
+                </div>                  
+                <button onclick="openFolderAddModal()" class="text-xs border border-neutral-300 px-2 py-1 rounded hover:bg-neutral-50/10 transition-colors">+</button>                  
+            </div>                  
+                              
+            <div id="folder-list" class="space-y-3">                  
+                <!-- 폴더 목록 동적 생성 -->                  
+            </div>                  
+        </section>                  
+                  
+        <!-- [2] 폴더 상세 화면: 묶음 목록 -->                  
+        <section id="view-folder-detail" class="hidden space-y-6">                  
+            <div class="border-b border-neutral-200 pb-3">                  
+                <div class="flex items-center justify-between">                  
+                    <h2 id="current-folder-title" class="text-xl font-bold">폴더명</h2>                  
+                    <div class="flex gap-2">                  
+                        <button onclick="openRenameModal('folder')" class="text-xs border border-neutral-300 px-2 py-1 rounded hover:bg-neutral-500/10">이름 변경</button>
+                        <button onclick="triggerFolderDelete()" class="text-xs text-red-500 border border-red-200 px-2 py-1 rounded hover:bg-red-50/10 transition-colors">x</button>                  
+                    </div>                  
+                </div>                  
+            </div>                  
+                  
+            <div class="flex justify-between items-center">                  
+                <h3 class="text-sm tracking-wider opacity-60 font-medium">암기 묶음</h3>                  
+                <button onclick="openSetAddModal()" class="text-xs border border-neutral-300 px-2 py-1 rounded hover:bg-neutral-500/10 transition-colors">+</button>                  
+            </div>                  
+                  
+            <div id="set-list" class="space-y-3">                  
+                <!-- 묶음 목록 동적 생성 -->                  
+            </div>                  
+        </section>                  
+                  
+        <!-- [3] 묶음 상세 화면: 모드 및 난이도 선택 -->                  
+        <section id="view-set-detail" class="hidden space-y-6">                  
+            <div class="border-b border-neutral-200 pb-3 flex justify-between items-center">                  
+                <div>                  
+                    <h2 id="current-set-title" class="text-xl font-bold">묶음명</h2>                  
+                    <p class="text-xs opacity-50 mt-1">완주 횟수: <span id="current-set-count" class="font-bold">0</span>회</p>                  
+                </div>                  
+                <div class="flex gap-2">                  
+                    <button onclick="openSetDataEdit()" class="text-xs border border-neutral-300 px-2.5 py-1 rounded hover:bg-neutral-50/10 transition-colors">데이터 관리</button>                  
+                    <button onclick="openRenameModal('set')" class="text-xs border border-neutral-300 px-2 py-1 rounded hover:bg-neutral-500/10">이름 변경</button>
+                    <button onclick="triggerSetDelete()" class="text-xs text-red-500 border border-red-200 px-2 py-1 rounded hover:bg-red-50/10 transition-colors">x</button>                  
+                </div>                  
+            </div>                  
+                  
+            <!-- 이어하기 안내 배너 -->                  
+            <div id="resume-banner" class="hidden border border-neutral-900/40 p-4 rounded bg-neutral-500/5 space-y-2">                  
+                <p class="text-xs font-semibold text-inherit" id="resume-details">이어서 학습할 수 있습니다.</p>                  
+                <div class="flex gap-2 pt-1">                  
+                    <button onclick="resumeStudy()" class="text-xs bg-neutral-950 text-white dark:bg-neutral-100 dark:text-neutral-900 px-3 py-1.5 rounded hover:opacity-90 transition-colors">이어서 학습하기</button>                  
+                    <button onclick="clearResumeData()" class="text-xs border border-neutral-300 px-2.5 py-1.5 rounded opacity-60 hover:bg-neutral-500/10 transition-colors">새로 시작</button>                  
+                </div>                  
+            </div>                  
+                  
+            <!-- 통합 제어 위치 슬롯 (테마 상태에 따라 다이얼 또는 기존 선택기가 교차 배치됨) -->                  
+                  
+            <!-- [교차 배치 A] 일반 테마용 난이도 선택 버튼 그룹 ( 시 JS에서 강제 hidden 처리됨) -->                  
+            <div id="difficulty-selector-box" class="bg-neutral-500/5 p-3 rounded border border-neutral-200/40 flex items-center justify-between gap-2">                  
+                <span class="text-xs font-medium opacity-80 shrink-0">난이도 선택</span>                  
+                <div class="flex border border-neutral-300 rounded overflow-hidden">                  
+                    <button id="diff-me-btn" onclick="setDifficulty('ME')" class="px-3.5 py-1.5 text-xs font-bold transition-all">  메  </button>                  
+                    <button id="diff-mo-btn" onclick="setDifficulty('MO')" class="px-3.5 py-1.5 text-xs font-bold transition-all">  모  </button>                  
+                    <button id="diff-re-btn" onclick="setDifficulty('RE')" class="px-3.5 py-1.5 text-xs font-bold transition-all">  RE  </button>                  
+                </div>                  
+            </div>
+            <!-- 3가지 학습 모드 버튼 -->                  
+            <div class="space-y-3 pt-2">                  
+                <button onclick="startStudy('MEMORIZE')" class="w-full border border-neutral-900/40 p-5 text-left rounded hover:bg-neutral-500/5 transition-all flex justify-between items-center group">                  
+                    <div>                  
+                        <span class="text-base font-bold text-inherit">암기 모드</span>                  
+                                          
+                    </div>                  
+                    <span class="opacity-30 group-hover:opacity-100 transition-colors">→</span>                  
+                </button>                  
+                  
+                <button onclick="startStudy('SEQUENCE')" class="w-full border border-neutral-900/40 p-5 text-left rounded hover:bg-neutral-500/5 transition-all flex justify-between items-center group">                  
+                    <div>                  
+                        <span class="text-base font-bold text-inherit">배열 모드</span>                  
+                        <p class="text-xs opacity-60 mt-1">드래그앤드롭으로 순서를 정렬하고 중요 성격과 뜻을 검증합니다.</p>                  
+                    </div>                  
+                    <span class="opacity-30 group-hover:opacity-100 transition-colors">→</span>                  
+                </button>                  
+                  
+                <button onclick="startStudy('CLASSIFY')" class="w-full border border-neutral-900/40 p-5 text-left rounded hover:bg-neutral-500/5 transition-all flex justify-between items-center group">                  
+                    <div>                  
+                        <span class="text-base font-bold text-inherit">분류 모드</span>                  
+                        <p class="text-xs opacity-60 mt-1">카드를 터치하여 명칭과 상세 힌트를 보며 분류군에 매칭시킵니다.</p>                  
+                    </div>                  
+                    <span class="opacity-30 group-hover:opacity-100 transition-colors">→</span>                  
+                </button>                  
+            </div>                  
+        </section>                  
+                  
+        <!-- [4] 학습 화면 - 암기 모드 (MEMORIZE) -->                  
+        <section id="view-study-memorize" class="hidden space-y-6">                  
+            <!--  전용: 상단 주파수 연출 보드 -->  
+                <div class="flex items-center justify-between text-[10px]">  
+                    <!-- 춤추는 이퀼라이저 파형 -->  
+                    <div class="flex items-end gap-0.5 h-4">  
+                    </div>  
+                </div>  
+            </div>  
+  
+            <div class="flex justify-between items-center text-xs opacity-60 border-b border-neutral-200/40 pb-2">                  
+                <div>암기 모드 (<span id="memorize-diff-label">메</span>)</div>                  
+                <div>남은 카드: <span id="memorize-left-count" class="font-bold text-inherit">0</span>장</div>                  
+            </div>                  
+                  
+            <p class="text-[11px] opacity-50 text-center select-none" id="swipe-guide-text">                  
+                💡 카드를 탭하면 뒤집어집니다. 양옆으로 끌어다 던질 수도 있습니다.                  
+            </p>                  
+                  
+            <div id="memorize-card-wrapper" class="relative h-64 w-full flex items-center justify-center overflow-visible" style="touch-action: none;">                  
+                <div id="memorize-drag-container" class="w-full h-full absolute" style="will-change: transform, opacity; transition: transform 0.45s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.45s ease;">                  
+                                      
+                    <div class="card-perspective">                  
+                        <div id="memorize-flip-card-inner" class="flip-card-inner border border-neutral-900/40 rounded-lg shadow-sm">                  
+                            <!-- 앞면 -->                  
+                            <div class="flip-card-front flex flex-col justify-between p-6 select-none pointer-events-none">                  
+                                <span class="text-xs opacity-40 uppercase tracking-widest font-mono" id="memorize-front-tag">Front (앞면)</span>                  
+                                <div class="text-center text-lg font-bold text-inherit my-auto px-4" id="memorize-front-text">앞면</div>                  
+                                <span class="text-xs text-center opacity-40">터치 시 뒤집어집니다.</span>                  
+                            </div>                  
+                            <!-- 뒷면 -->                  
+                            <div class="flip-card-back flex flex-col justify-between p-6 select-none pointer-events-none">                  
+                                <span class="text-xs opacity-50 uppercase tracking-widest font-mono" id="memorize-back-tag">Back (뒷면 / 뜻)</span>                  
+                                <div class="text-center text-lg font-bold text-inherit my-auto px-4" id="memorize-back-text">뒷면</div>                  
+                                <span class="text-xs text-center opacity-40" id="memorize-back-tip">외우셨다면 오른쪽, 모르면 왼쪽 슬라이드</span>                  
+                            </div>                  
+                        </div>                  
+                    </div>                  
+                  
+                </div>                  
+            </div>                  
+                  
+            <!-- '모' / 'RE' 난이도 정답 입력창 -->                  
+            <div id="memorize-input-area" class="hidden space-y-3">                  
+                <label class="block text-xs font-medium opacity-60" id="memorize-input-label">답변 직접 입력</label>                  
+                <div class="flex gap-2">                  
+                    <input type="text" id="memorize-user-input" placeholder="정답을 입력해 주세요" class="app-input flex-grow border p-2.5 text-sm rounded focus:outline-none bg-inherit text-inherit">                  
+                    <button id="memorize-submit-btn" onclick="checkMemorizeInput()" class="bg-neutral-900 text-white dark:bg-neutral-100 dark:text-neutral-900 px-5 rounded text-sm font-bold hover:opacity-90">확인</button>                  
+                </div>                  
+                <div id="memorize-feedback" class="hidden p-3 border rounded text-xs"></div>                  
+            </div>                  
+                  
+            <div class="w-full bg-neutral-500/10 h-1.5 rounded-full overflow-hidden">                  
+                <div id="memorize-progress-bar" class="bg-neutral-900 dark:bg-neutral-100 h-full transition-all duration-300" style="width: 0%"></div>                  
+            </div>                  
+        </section>                  
+                  
+        <!-- [5] 배열 모드 (SEQUENCE) -->                  
+        <section id="view-study-sequence" class="hidden space-y-6">                  
+            <div class="flex justify-between items-center text-xs opacity-60 border-b border-neutral-200/40 pb-2">                  
+                <div>배열 모드 (<span id="sequence-diff-label">메</span>)</div>                  
+                <div class="text-xs opacity-40">순서 재배치 및 채점</div>                  
+            </div>                  
+                  
+            <p class="text-xs opacity-60 text-center select-none">                  
+                💡 항목을 드래그하여 위아래로 올바른 순서를 정렬하세요.                  
+                <span id="seq-guide-mo" class="block font-bold text-inherit mt-1 hidden">⚠️ '모' 난이도: 순서 정렬 후 각 항목에 들어갈 뜻(설명)도 기입하세요!</span>                  
+                <span id="seq-guide-re" class="block font-bold text-inherit mt-1 hidden">⚠️ 'RE' 난이도: 뜻(설명)에 알맞은 원래 항목 '명칭'을 입력하세요!</span>                  
+            </p>                  
+                  
+            <div id="sequence-list-container" class="space-y-2.5 relative select-none"></div>                  
+                  
+            <div class="space-y-3">                  
+                <div id="sequence-feedback" class="hidden p-4 border rounded text-xs text-center font-bold"></div>                  
+                <button id="sequence-submit-btn" onclick="checkSequenceAnswer()" class="w-full bg-neutral-900 text-white dark:bg-neutral-100 dark:text-neutral-900 p-3.5 rounded text-sm font-bold hover:opacity-90 transition-colors">                  
+                    정답 확인 (채점)                  
+                </button>                  
+            </div>                  
+        </section>                  
+                  
+        <!-- [6] 분류 모드 (CLASSIFY) -->                  
+        <section id="view-study-classify" class="hidden space-y-6">                  
+            <div class="flex justify-between items-center text-xs opacity-60 border-b border-neutral-200/40 pb-2">                  
+                <div>분류 모드 (<span id="classify-diff-label">메</span>)</div>                  
+                <div>남은 카드: <span id="classify-left-count" class="font-bold text-inherit">0</span>장</div>                  
+            </div>                  
+                  
+            <p class="text-[11px] opacity-40 text-center select-none">                  
+                💡 대상을 탭하여 뒤집으면 상세 내용/힌트를 확인할 수 있습니다.                  
+            </p>                  
+                  
+            <!-- 분류 대상 카드 플립 시스템 적용 -->                  
+            <div id="classify-card-wrapper" class="relative h-48 w-full cursor-pointer" onclick="flipClassifyCard()">                  
+                <div class="card-perspective">                  
+                    <div id="classify-flip-card-inner" class="flip-card-inner border border-neutral-900/40 rounded-lg shadow-sm">                  
+                        <!-- 앞면 -->                  
+                        <div class="flip-card-front flex flex-col justify-between p-5 select-none">                  
+                            <span class="text-xs opacity-40 font-mono" id="classify-front-tag">CLASSIFY TARGET</span>                  
+                            <h3 id="classify-card-name" class="text-xl font-bold text-inherit text-center my-auto">카드 명칭</h3>                  
+                            <span class="text-[10px] text-center opacity-40">터치하여 내용 뒤집기</span>                  
+                        </div>                  
+                        <!-- 뒷면 -->                  
+                        <div class="flip-card-back flex flex-col justify-between p-5 select-none">                  
+                            <span class="text-xs opacity-50 font-mono" id="classify-back-tag">DESCRIPTION / HINT</span>                  
+                            <p id="classify-card-desc" class="text-sm font-medium text-inherit text-center my-auto px-2">상세 뜻 및 정의 설명</p>                  
+                            <span class="text-[10px] text-center opacity-40">하단 분류 버튼을 누르세요.</span>                  
+                        </div>                  
+                    </div>                  
+                </div>                  
+            </div>                  
+                  
+            <!-- 분류 선택지 버튼 -->                  
+            <div class="space-y-2 pt-2">                  
+                <span class="block text-xs font-semibold opacity-50 mb-1">매칭할 대분류 선택</span>                  
+                <div id="classify-category-buttons" class="grid grid-cols-2 gap-2"></div>                  
+            </div>                  
+                  
+            <div id="classify-feedback" class="hidden p-3 border rounded text-xs font-bold"></div>                  
+                  
+            <div class="w-full bg-neutral-500/10 h-1.5 rounded-full overflow-hidden">                  
+                <div id="classify-progress-bar" class="bg-neutral-900 dark:bg-neutral-100 h-full transition-all duration-300" style="width: 0%"></div>                  
+            </div>                  
+        </section>                  
+                  
+        <!-- [7] 학습 완료 화면 -->                  
+        <section id="view-study-complete" class="hidden text-center py-8 space-y-6">                  
+            <div class="max-w-[170px] mx-auto overflow-hidden">                  
+                <div id="ruri-img-container" class="relative w-full aspect-square flex items-center justify-center text-center">                  
+                    <!-- 랜덤 이미지 바인딩 (JS에서 동적 맵핑) -->                  
+                    <img id="complete-ruri-img" src="" alt="축하 이미지" class="w-full h-full object-contain transition-opacity duration-300 opacity-100" onerror="handleRuriImgError()">                  
+                    <!-- 기본 축하 대체 레이아웃 (캐릭터 테마가 아닐 때 출력) -->                  
+                    <div id="complete-ruri-fallback" class="hidden absolute inset-0 flex items-center justify-center text-center">                  
+                        <div class="text-6xl">🏆</div>                  
+                    </div>                  
+                </div>                  
+            </div>                  
+                  
+            <div class="space-y-2">                  
+                <h2 class="text-2xl font-bold">학습 완료!</h2>                  
+                <p class="text-sm opacity-60">모든 단어 및 분류를 정복해 내셨습니다.</p>                  
+            </div>                  
+            <div class="border-y border-neutral-200/40 py-4 max-w-xs mx-auto text-sm opacity-80">                  
+                <p>완주 횟수가 <strong id="complete-count-before">0</strong>회에서</p>                  
+                <p class="text-lg font-bold mt-1"><span id="complete-count-after">1</span>회로 증가했습니다.</p>                  
+            </div>                  
+            <button id="complete-return-btn" onclick="goToCurrentSetDetail()" class="w-full bg-neutral-900 text-white dark:bg-neutral-100 dark:text-neutral-900 p-3 rounded text-sm font-bold hover:opacity-90 transition-colors">묶음 홈으로 돌아가기</button>                  
+        </section>                  
+                  
+        <!-- [8] 데이터 관리 화면 -->                  
+        <section id="view-data-edit" class="hidden space-y-6">                  
+            <div class="border-b border-neutral-200 pb-3 flex justify-between items-center">                  
+                <div>                  
+                    <h2 class="text-lg font-bold">데이터 세부 관리</h2>                  
+                    <p class="text-xs opacity-50 mt-1">각 모드별 카드 정보를 구성합니다.</p>                  
+                </div>                  
+                <button id="save-exit-btn"  
+                onclick="saveAndExitDataEdit()"  
+                class="bg-neutral-900 text-white dark:bg-neutral-100 dark:text-neutral-900 rounded hover:opacity-90"  
+                style="padding:4px 8px; font-size:11px; line-height:1.15; width:auto; min-width:0;">     
+                저장 및 종료  
+                </button>  
+            </div>                  
+                  
+            <!-- 탭 선택기 -->                  
+            <div class="flex border-b border-neutral-200">                  
+                <button onclick="switchDataTab('MEMORIZE')" id="tab-btn-memorize" class="flex-1 py-2 text-xs font-bold text-center border-b-2 border-neutral-900 text-inherit">암기 카드</button>                  
+                <button onclick="switchDataTab('SEQUENCE')" id="tab-btn-sequence" class="flex-1 py-2 text-xs font-bold text-center border-b-2 border-transparent opacity-40 hover:opacity-75">배열 카드</button>                  
+                <button onclick="switchDataTab('CLASSIFY')" id="tab-btn-classify" class="flex-1 py-2 text-xs font-bold text-center border-b-2 border-transparent opacity-40 hover:opacity-75">분류 카드</button>                  
+            </div>                  
+                  
+            <!-- 탭 1: 암기 카드 -->                  
+            <div id="data-tab-content-memorize" class="space-y-4">                  
+                <div class="bg-neutral-500/5 p-3 rounded border border-neutral-200/40 space-y-3">                  
+                    <span class="block text-xs font-bold">새 암기 카드 추가</span>                  
+                    <div class="grid grid-cols-2 gap-2">                  
+                        <input type="text" id="add-mem-front" placeholder="앞면 (예: Apple)" class="app-input border p-2 text-xs rounded focus:outline-none bg-inherit text-inherit">                  
+                        <input type="text" id="add-mem-back" placeholder="뒷면 (예: 사과)" class="app-input border p-2 text-xs rounded bg-inherit text-inherit focus:outline-none">                  
+                    </div>                  
+                    <button onclick="addMemorizeCardRow()" class="w-full bg-neutral-900 text-white dark:bg-neutral-100 dark:text-neutral-900 py-1.5 rounded text-xs font-semibold hover:opacity-90">추가</button>                  
+                </div>                  
+                <div id="data-list-memorize" class="space-y-1.5 max-h-60 overflow-y-auto"></div>                  
+            </div>                  
+                  
+            <!-- 탭 2: 배열 카드 -->                  
+            <div id="data-tab-content-sequence" class="hidden space-y-4">                  
+                <div class="bg-neutral-500/5 p-3 rounded border border-neutral-200/40 space-y-3">                  
+                    <span class="block text-xs font-bold">새 배열 항목 추가 (입력 순서가 정답이 됩니다)</span>                  
+                    <div class="space-y-2">                  
+                        <input type="text" id="add-seq-text" placeholder="항목 명칭 (예: 1단계: 프로젝트 기획)" class="app-input w-full border p-2 text-xs rounded focus:outline-none bg-inherit text-inherit">                  
+                        <input type="text" id="add-seq-desc" placeholder="항목의 뜻 또는 연계 상세 설명 (예: 요구사항 수집 및 예산 산정)" class="app-input w-full border p-2 text-xs rounded bg-inherit text-inherit focus:outline-none">                  
+                    </div>                  
+                    <button onclick="addSequenceRow()" class="w-full bg-neutral-900 text-white dark:bg-neutral-100 dark:text-neutral-900 py-1.5 rounded text-xs font-semibold hover:opacity-90">추가</button>                  
+                </div>                  
+                <div id="data-list-sequence" class="space-y-1.5 max-h-60 overflow-y-auto"></div>                  
+            </div>                  
+                  
+            <!-- 탭 3: 분류 카드 -->                  
+            <div id="data-tab-content-classify" class="hidden space-y-4">                  
+                <div class="bg-neutral-500/5 p-3 rounded border border-neutral-200/40 space-y-3">                  
+                    <span class="block text-xs font-bold">새 분류 카드 추가</span>                  
+                    <div class="space-y-2">                  
+                        <div class="grid grid-cols-2 gap-2">                  
+                            <input type="text" id="add-cls-card" placeholder="카드명 (예: 고래)" class="app-input border p-2 text-xs rounded focus:outline-none bg-inherit text-inherit">                  
+                            <input type="text" id="add-cls-group" placeholder="대분류명 (예: 동물)" class="app-input border p-2 text-xs rounded bg-inherit text-inherit focus:outline-none">                  
+                        </div>                  
+                        <input type="text" id="add-cls-desc" placeholder="뜻 / 상세 설명" class="app-input w-full border p-2 text-xs rounded bg-inherit text-inherit focus:outline-none">                  
+                    </div>                  
+                    <button onclick="addClassifyRow()" class="w-full bg-neutral-900 text-white dark:bg-neutral-100 dark:text-neutral-900 py-1.5 rounded text-xs font-semibold hover:opacity-90">추가</button>                  
+                </div>                  
+                <div id="data-list-classify" class="space-y-1.5 max-h-60 overflow-y-auto"></div>                  
+            </div>                  
+        </section>                  
+    </main>                  
+                  
+    <!-- 푸터 -->                  
+    <footer class="border-t border-neutral-200/40 py-4 text-center text-[11px] opacity-40">                  
+        메모RE © 2026. 암기 효율 극대화.                  
+    </footer>                  
+                  
+    <!-- [모달] 폴더 추가 -->                  
+    <div id="modal-folder-add" class="hidden fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">                  
+        <div class="app-modal-content border w-full max-w-xs p-5 rounded-lg space-y-4 text-inherit">                  
+            <h3 class="text-sm font-bold">새 폴더 생성</h3>                  
+            <input type="text" id="folder-name-input" placeholder="폴더 이름을 입력하세요" class="app-input w-full border p-2 text-xs rounded focus:outline-none">                  
+            <div class="flex gap-2 justify-end">                  
+                <button onclick="closeFolderAddModal()" class="app-modal-btn-cancel px-3 py-1.5 text-xs rounded">취소</button>                  
+                <button onclick="createNewFolder()" class="app-modal-btn-confirm px-4 py-1.5 text-xs rounded">생성</button>                  
+            </div>                  
+        </div>                  
+    </div>                  
+                  
+    <!-- [모달] 묶음 추가 -->                  
+    <div id="modal-set-add" class="hidden fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">                  
+        <div class="app-modal-content border w-full max-w-xs p-5 rounded-lg space-y-4 text-inherit">                  
+            <h3 class="text-sm font-bold">새 묶음 생성</h3>                  
+            <input type="text" id="set-name-input" placeholder="묶음 이름을 입력하세요" class="app-input w-full border p-2 text-xs rounded focus:outline-none bg-inherit text-inherit">                  
+            <div class="flex gap-2 justify-end">                  
+                <button onclick="closeSetAddModal()" class="app-modal-btn-cancel px-3 py-1.5 text-xs rounded">취소</button>                  
+                <button onclick="createNewSet()" class="app-modal-btn-confirm px-4 py-1.5 text-xs rounded">생성</button>                  
+            </div>                  
+        </div>                  
+    </div>                  
+                  
+
+    <!-- 이름 변경 -->
+    <div id="modal-rename" class="hidden fixed inset-0 bg-black/40 flex items-center justify-center p-4 z-50">
+        <div class="app-modal-content border w-full max-w-xs p-5 rounded-2xl space-y-4 text-inherit">
+            <div class="flex justify-between items-center"><h3 id="rename-title" class="text-sm font-bold">이름 변경</h3><button onclick="closeRenameModal()" class="opacity-40 text-lg">×</button></div>
+            <input id="rename-input" type="text" class="app-input w-full border p-2 text-xs rounded focus:outline-none" autocomplete="off">
+            <div class="flex gap-2 justify-end"><button onclick="closeRenameModal()" class="app-modal-btn-cancel px-3 py-1.5 text-xs rounded">취소</button><button onclick="saveRename()" class="app-modal-btn-confirm px-4 py-1.5 text-xs rounded">저장</button></div>
+        </div>
+    </div>
+
+    <!-- 도움말 모달 -->                  
+    <div id="modal-help" class="hidden fixed inset-0 flex items-center justify-center p-4 z-[9999]" style="background-color: rgba(0,0,0,0.5);">                  
+        <div class="app-modal-content border w-full max-w-sm p-6 rounded-lg space-y-4 text-xs text-inherit shadow-2xl overflow-y-auto max-h-[90vh]">                  
+            <div class="flex justify-between items-center border-b pb-2 border-neutral-200/40">                  
+                <h3 class="font-bold">메 / 모 / RE 난이도 학습 안내</h3>                  
+                <button onclick="toggleHelpModal()" class="opacity-40 hover:opacity-100 text-lg">×</button>                  
+            </div>                  
+            <div class="space-y-4 text-left leading-relaxed">                  
+                <div class="space-y-1">                  
+                    <span class="inline-block bg-neutral-950 text-white dark:bg-neutral-100 dark:text-neutral-900 px-2 py-0.5 rounded font-bold text-[10px]">메 (ME) 방식</span>                  
+                    <p class="font-medium">정답을 머릿속으로 떠올려 스스로 평가하거나 물리 정렬하는 자가 진단형 학습</p>                  
+                    <ul class="list-disc pl-4 space-y-1 opacity-60">                  
+                        <li><strong>암기</strong>: 앞면을 보고 답을 떠올린 후, 카드를 뒤집어 확인합니다.</li>                  
+                        <li><strong>배열</strong>: 항목 카드를 손으로 드래그하여 올바른 순서로 재배치합니다.</li>                  
+                        <li><strong>분류</strong>: 제시 카드가 하단 어떤 대분류 그룹에 속하는지 매칭합니다.</li>                  
+                    </ul>                  
+                </div>                  
+                <div class="space-y-1">                  
+                    <span class="inline-block border border-neutral-950 dark:border-neutral-100 px-2 py-0.5 rounded font-bold text-[10px]">모 (MO) 방식</span>                  
+                    <p class="font-medium">답안과 세부 정의를 직접 작성하여 점검하는 완성형 검증 학습</p>                  
+                    <ul class="list-disc pl-4 space-y-1 opacity-60">                  
+                        <li><strong>암기</strong>: 인풋 폼에 카드 뒷면의 정답을 완벽히 타이핑해야 정답 인정됩니다.</li>                  
+                        <li><strong>배열</strong>: 순서 배치 후, 각 항목의 뜻과 상세 쓰임새를 직접 입력해야 합니다.</li>                  
+                        <li><strong>분류</strong>: 일반 분류와 동일하게 진행되며 터치 힌트를 활용해 카드를 구분할 수 있습니다.</li>                  
+                    </ul>                  
+                </div>                  
+                <div class="space-y-1">                  
+                    <span class="inline-block bg-teal-700 text-white px-2 py-0.5 rounded font-bold text-[10px]">RE 방식 (거꾸로 학습)</span>                  
+                    <p class="font-medium">기존의 앞/뒤, 명칭/뜻 구조를 완벽하게 뒤바꿔 출력해 뇌에 새로운 역방향 인지 자극을 주는 심화 학습</p>                  
+                    <ul class="list-disc pl-4 space-y-1 opacity-60">                  
+                        <li><strong>암기</strong>: 뜻(뒷면)이 앞면에 먼저 출력되며, 사용자는 원래 단어(앞면)를 직접 타이핑하여 검증합니다.</li>                  
+                        <li><strong>배열</strong>: 카드가 항목의 뜻(설명)으로 먼저 노출되며, 사용자는 그에 알맞은 원래 '명칭'을 입력해야 정답 처리됩니다.</li>                  
+                        <li><strong>분류</strong>: 카드 앞면에 원래 상세 설명(뜻)이 나타나며, 카드를 뒤집어야 원래 카드명(이름)을 볼 수 있습니다.</li>                  
+                    </ul>                  
+                </div>                  
+            </div>                  
+            <button onclick="toggleHelpModal()" class="app-modal-btn-confirm w-full py-2 rounded font-bold hover:opacity-90">확인완료</button>                  
+        </div>                  
+    </div>                  
+                  
+    <!-- 안전한 내부 삭제 전용 모달 -->                  
+    <div id="modal-delete-confirm" class="hidden fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">                  
+        <div class="app-modal-content border w-full max-w-xs p-5 rounded-lg space-y-4 text-center text-inherit">                  
+            <h3 class="text-sm font-bold" id="delete-modal-title">정말 삭제하시겠습니까?</h3>                  
+            <p class="text-xs opacity-50" id="delete-modal-desc">데이터가 즉시 파괴됩니다.</p>                  
+            <div class="flex gap-2">                  
+                <button onclick="closeDeleteConfirmModal()" class="app-modal-btn-cancel flex-1 py-2 text-xs rounded">취소</button>                  
+                <button onclick="executeConfirmedDeletion()" class="flex-1 bg-red-600 text-white py-2 text-xs rounded font-bold">삭제</button>                  
+            </div>                  
+        </div>                  
+    </div>                  
+                  
+    <!-- [모달] 테마 선택 창 -->                  
+    <div id="modal-theme" class="hidden fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">                  
+        <div class="app-modal-content border w-full max-w-xs p-5 rounded-lg space-y-4 text-inherit">                  
+            <div class="flex justify-between items-center border-b pb-2 border-neutral-200/40">                  
+                <h3 class="text-sm font-bold">테마 스타일 선택</h3>                  
+                <button onclick="toggleThemeModal()" class="opacity-40 hover:opacity-100 text-lg">×</button>                  
+            </div>                  
+            <!-- 테마 선택지 리스트 (기본 & 콜라보레이션 레이아웃) -->                  
+            <div class="space-y-3 max-h-80 overflow-y-auto pr-1">                  
+                <!-- 기본 테마 섹션 -->                  
+                <div>                  
+                    <span class="block text-[10px] font-bold uppercase tracking-wider opacity-50 mb-1.5">기본 테마</span>                  
+                    <div class="space-y-1.5">                  
+                        <!-- 화이트 테마 -->                  
+                        <button onclick="selectTheme('white')" class="w-full flex items-center gap-3 p-2.5 rounded-lg border border-neutral-200 hover:bg-neutral-100 text-neutral-900 bg-white transition-colors text-left">                  
+                            <span class="w-5 h-5 rounded-full bg-white border border-neutral-400 shrink-0"></span>                  
+                            <div class="flex-1">                  
+                                <div class="text-xs font-bold">화이트 (White)</div>                  
+                            </div>                  
+                        </button>                  
+                        <!-- 아이보리 테마 -->                  
+                        <button onclick="selectTheme('ivory')" class="w-full flex items-center gap-3 p-2.5 rounded-lg border border-neutral-300 hover:bg-[#eae6db] text-[#2b2927] bg-[#f7f4eb] transition-colors text-left">                  
+                            <span class="w-5 h-5 rounded-full bg-[#f7f4eb] border border-neutral-400 shrink-0"></span>                  
+                            <div class="flex-1">                  
+                                <div class="text-xs font-bold">아이보리 (Ivory)</div>                  
+                            </div>                  
+                        </button>                  
+                    </div>                  
+                </div>                  
+            <button onclick="toggleThemeModal()" class="app-modal-btn-cancel w-full py-2 rounded text-xs font-bold">닫기</button>                  
+        </div>                  
+    </div>                  
+        
+    <!-- [모달] 파일별 데이터 동기화 -->
+    <div id="modal-sync" class="hidden fixed inset-0 bg-black/40 flex items-center justify-center p-4 z-50">
+        <div class="app-modal-content border w-full max-w-sm p-5 rounded-2xl space-y-4 text-inherit shadow-2xl">
+            <div class="flex justify-between items-center border-b pb-2 border-neutral-200/40"><h3 class="text-sm font-bold">데이터 동기화</h3><button onclick="toggleSyncModal()" class="opacity-40 text-lg">×</button></div>
+
+            <div class="space-y-2">
+                <label class="text-xs font-bold">동기화 범위</label>
+                <select id="sync-scope" onchange="updateSyncTargetUI()" class="app-input w-full border p-2 text-xs rounded">
+                    <option value="all">전체 데이터</option><option value="folder">폴더 하나</option><option value="set">묶음(파일) 하나</option>
+                </select>
+                <select id="sync-target" class="app-input w-full border p-2 text-xs rounded hidden"></select>
+            </div>
+            <textarea id="sync-raw-textarea" placeholder="복사한 동기화 코드를 붙여넣으세요." class="app-input w-full h-28 border p-2 text-[9px] font-mono rounded focus:outline-none" style="resize:none;"></textarea>
+            <div class="grid grid-cols-2 gap-2"><button onclick="copyRawTextSyncData()" class="app-modal-btn-cancel py-2 text-xs rounded font-bold">복사</button><button onclick="applyRawTextSyncData()" class="app-modal-btn-confirm py-2 text-xs rounded font-bold">적용</button></div>
+            <button onclick="toggleSyncModal()" class="app-modal-btn-cancel w-full py-2 rounded text-xs font-bold">닫기</button>
+        </div>
+    </div>
+
+    <!-- ==================== 스크립트 엔진 ==================== -->                  
+    <script>                  
+        const DEFAULT_DATA = {                  
+            folders: [                  
+                {                  
+                    id: "folder_sample",                  
+                    name: "기본 학습 샘플 폴더",                  
+                    sets: [                  
+                        {                  
+                            id: "set_sample",                  
+                            name: "통합 지식 테스트 세트",                  
+                            count: 0,                  
+                            cards: {                  
+                                MEMORIZE: [                  
+                                    { front: "Apple", back: "사과" },                  
+                                    { front: "Banana", back: "바나나" }                  
+                                ],                  
+                                SEQUENCE: [                  
+                                    { text: "태조 이성계", desc: "조선 건국 및 한양 천도" },                  
+                                    { text: "태종 이방원", desc: "왕권 강화 및 호패법 실시" },                  
+                                    { text: "세종대왕", desc: "훈민정음 창제 및 4군 6진 개척" }                  
+                                ],                  
+                                CLASSIFY: [                  
+                                    { card: "고래", group: "포유류", desc: "허파로 숨을 쉬는 바다 동물" },                  
+                                    { card: "독수리", group: "조류", desc: "깃털이 있고 알을 낳는 날개 동물" }                  
+                                ]                  
+                            }                  
+                        }                  
+                    ]                  
+                }                  
+            ]                  
+        };                  
+                  
+        const SafeStorage = {                  
+            getItem(key) { try { return localStorage.getItem(key); } catch(e) { return null; } },                  
+            setItem(key, val) { try { localStorage.setItem(key, val); } catch(e) {} }                  
+        };                  
+                  
+        let appData = null;                  
+        let navigationStack = [];                  
+        let currentView = "view-home";                  
+        let selectedFolderId = null;                  
+        let selectedSetId = null;                  
+        let currentDifficulty = "ME"; // ME, MO, RE                  
+        let studySessions = {};
+        window.studySessions = studySessions;                  
+        let activeSession = null;                  
+        let pendingDeleteContext = null;                   
+                  
+        let editState = { mode: null, index: null };                  
+        let currentTheme = "white";                  
+                  
+        let isMoving = false;                  
+        let startX = 0; let startY = 0;                  
+        let currentX = 0; let currentY = 0;                  
+        let dragStartTime = 0;                  
+        let isDraggedSignificant = false;                  
+                  
+        window.onload = function() {                  
+            loadAllData();                  
+            initTheme();                  
+            initSyncIndicator();                  
+            renderHome();                  
+        };                  
+                  
+        function loadAllData() {
+            const savedData = SafeStorage.getItem("memore_app_data_v7");
+            let loaded = false;
+            if (savedData) {
+                try {
+                    const parsed = JSON.parse(savedData);
+                    if (parsed && Array.isArray(parsed.folders)) { appData = parsed; loaded = true; }
+                    else throw new Error("invalid appData");
+                } catch(e) {
+                    // 절대 기존 데이터를 덮어쓰거나 삭제하지 않는다.
+                    SafeStorage.setItem("memore_recovery_backup_v1", savedData);
+                }
+            }
+            if (!loaded) appData = JSON.parse(JSON.stringify(DEFAULT_DATA));
+
+            const savedSessions = SafeStorage.getItem("memore_sessions_v7");
+            if (savedSessions) {
+                try {
+                    const parsedSessions = JSON.parse(savedSessions);
+                    if (parsedSessions && typeof parsedSessions === "object") studySessions = parsedSessions;
+                } catch(e) {
+                    SafeStorage.setItem("memore_sessions_recovery_backup_v1", savedSessions);
+                }
+            }
+
+            // 기존 데이터가 정상적으로 존재하면 다시 기본값으로 저장하지 않는다.
+            if (!savedData && appData) saveToLocalStorage();
+            window.appData = appData;
+            window.studySessions = studySessions;
+
+            // 삭제된 테마를 사용하던 기존 사용자도 데이터는 그대로 유지하고 UI만 화이트로 전환한다.
+            const savedTheme = SafeStorage.getItem("memore_theme");
+            if (savedTheme === "someone" || savedTheme === "ruri" || savedTheme === "dark") {
+                currentTheme = "white";
+                SafeStorage.setItem("memore_theme", "white");
+            }
+        }
+
+        function saveToLocalStorage() {                   
+            if (appData) {                  
+                SafeStorage.setItem("memore_app_data_v7", JSON.stringify(appData));                  
+            }                  
+        }                  
+        function saveSessionsToLocalStorage() { SafeStorage.setItem("memore_sessions_v7", JSON.stringify(studySessions)); }                  
+                  
+        // ==================== 수동 동기화 램프(ON AIR 라벨 포함) 라이팅 모듈 (초록 원 강제 노출 방지 구조) ====================  
+        function setSyncStatusIndicator(state) {
+            const indicator = document.getElementById("sync-status-indicator");
+            const syncMainBtn = document.getElementById("sync-main-btn");
+            if (!syncMainBtn) return;
+            syncMainBtn.className = "w-8 h-8 flex items-center justify-center border border-neutral-300 rounded hover:opacity-80 transition-all";
+            if (indicator) {
+                indicator.className = state === "pulse"
+                    ? "w-3.5 h-3.5 rounded-full bg-emerald-400 border border-white transition-all duration-300 animate-pulse"
+                    : "w-3.5 h-3.5 rounded-full bg-emerald-500 border border-white transition-all duration-300";
+                if (state === "pulse") setTimeout(() => {
+                    if (indicator) indicator.className = "w-3.5 h-3.5 rounded-full bg-emerald-500 border border-white transition-all duration-300";
+                }, 1200);
+            }
+        }
+
+        // 초기화 시 램프 바인딩  
+        function initSyncIndicator() {  
+            setSyncStatusIndicator("normal");  
+        }  
+  
+        // ==================== 테마 시스템 엔지니어링 ====================                  
+        function initTheme() {                  
+            const savedTheme = SafeStorage.getItem("memore_theme");                  
+            if (savedTheme) {                  
+                currentTheme = savedTheme;                  
+            }                  
+            applyThemeClasses(currentTheme);                  
+        }                  
+                  
+        function selectTheme(themeName) {                  
+            currentTheme = themeName;                  
+            SafeStorage.setItem("memore_theme", themeName);                  
+            applyThemeClasses(themeName);                  
+            toggleThemeModal();                  
+            customAlert(`스킨이 '${themeName.toUpperCase()}' 테마로 변경되었습니다.`);                  
+        }                  
+                  
+        function applyThemeClasses(theme) {
+            const body = document.body;
+            body.classList.remove("theme-white", "theme-dark", "theme-ivory", "theme-ruri", "");
+            if (theme === "ruri") theme = "white";
+            body.classList.add(`theme-${theme}`);
+            if (theme === "dark") body.classList.add("dark"); else body.classList.remove("dark");
+
+            const colorDot = document.getElementById("theme-btn-color");
+            if (colorDot) {
+                colorDot.style.backgroundImage = "none";
+                colorDot.className = "w-5 h-5 rounded-full border bg-cover bg-center transition-all";
+                if (theme === "white") colorDot.className += " bg-white border-neutral-400";
+                else if (theme === "dark") colorDot.className += " bg-[#1c1c1e] border-neutral-600";
+                else if (theme === "ivory") colorDot.className += " bg-[#f7f4eb] border-neutral-400";
+            }
+            updateDifficultyUI();
+        }
+
+        function toggleThemeModal() {
+            const modal = document.getElementById("modal-theme");
+            if (modal) modal.classList.toggle("hidden");
+        }
+
+        // ==================== 네비게이션 & 메인 렌더링 ====================                  
+        function changeView(viewId, pushToStack = true) {                  
+            const views = ["view-home", "view-folder-detail", "view-set-detail", "view-study-memorize", "view-study-sequence", "view-study-classify", "view-study-complete", "view-data-edit"];                  
+            views.forEach(v => document.getElementById(v)?.classList.add("hidden"));                  
+            document.getElementById(viewId)?.classList.remove("hidden");                  
+            if (pushToStack && currentView !== viewId) {                  
+                navigationStack.push({ view: currentView, folderId: selectedFolderId, setId: selectedSetId });                  
+            }                  
+            currentView = viewId;                  
+            document.getElementById("back-btn")?.classList.toggle("hidden", currentView === "view-home");                  
+            if (false) {  
+                syncTunerInterfaceWithDifficulty();  
+            }  
+        }                  
+                  
+        function goBack() {                  
+            if (navigationStack.length > 0) {                  
+                const prev = navigationStack.pop();                  
+                selectedFolderId = prev.folderId; selectedSetId = prev.setId;                  
+                changeView(prev.view, false);                  
+                if (prev.view === "view-home") renderHome();                  
+                else if (prev.view === "view-folder-detail") renderFolderDetail(selectedFolderId);                  
+                else if (prev.view === "view-set-detail") renderSetDetail(selectedSetId);                  
+            } else {                  
+                goHome();                  
+            }                  
+        }                  
+                  
+        function goHome() {                  
+            navigationStack = []; selectedFolderId = null; selectedSetId = null;                  
+            renderHome(); changeView("view-home", false);                  
+        }                  
+                  
+        function renderHome() {                  
+            const listEl = document.getElementById("folder-list"); if (!listEl) return; listEl.innerHTML = "";                  
+            if (!appData.folders || appData.folders.length === 0) {                  
+                listEl.innerHTML = `<div class="text-center py-10 border border-dashed border-neutral-400/40 text-xs opacity-50">폴더가 비어있습니다.</div>`;                  
+                return;                  
+            }                  
+            appData.folders.forEach(f => {                  
+                const div = document.createElement("div");                  
+                div.className = "drag-item border border-neutral-900/40 p-4 rounded hover:bg-neutral-500/5 cursor-pointer flex justify-between items-center bg-white/5 app-card-bg";                  
+                div.onclick = () => { selectedFolderId = f.id; renderFolderDetail(f.id); changeView("view-folder-detail"); };                  
+                div.innerHTML = `<div><span class="font-bold text-inherit">${escapeHtml(f.name)}</span></div><span>→</span>`;                  
+                listEl.appendChild(div);                  
+            });                  
+            applyThemeClasses(currentTheme);  
+        }                  
+                  
+        function renderFolderDetail(folderId) {                  
+            const folder = appData.folders.find(f => String(f.id) === String(folderId));                  
+            if (!folder) return;                  
+            document.getElementById("current-folder-title").innerText = folder.name;                  
+            const listEl = document.getElementById("set-list"); if (!listEl) return; listEl.innerHTML = "";                  
+            if (!folder.sets || folder.sets.length === 0) {                  
+                listEl.innerHTML = `<div class="text-center py-10 border border-dashed border-neutral-400/40 text-xs opacity-50">묶음이 없습니다.</div>`;                  
+                return;                  
+            }                  
+            folder.sets.forEach(s => {                  
+                const div = document.createElement("div");                  
+                div.className = "drag-item border border-neutral-900/40 p-4 rounded hover:bg-neutral-500/5 cursor-pointer flex justify-between items-center bg-white/5 app-card-bg";                  
+                div.onclick = () => { selectedSetId = s.id; renderSetDetail(s.id); changeView("view-set-detail"); };                  
+                div.innerHTML = `<div><span class="font-bold text-inherit">${escapeHtml(s.name)}</span></div><span class="text-xs bg-neutral-500/10 px-2 py-0.5 rounded text-inherit">${s.count || 0}</span>`;                  
+                listEl.appendChild(div);                  
+            });                  
+            applyThemeClasses(currentTheme);  
+        }                  
+                  
+        function openFolderAddModal() { document.getElementById("folder-name-input").value = ""; document.getElementById("modal-folder-add").classList.remove("hidden"); }                  
+        function closeFolderAddModal() { document.getElementById("modal-folder-add").classList.add("hidden"); }                  
+        function createNewFolder() {                  
+            const name = document.getElementById("folder-name-input").value.trim();                  
+            if(!name) return;                  
+            appData.folders.push({ id: "folder_" + Date.now(), name: name, sets: [] });                  
+            saveToLocalStorage(); renderHome(); closeFolderAddModal();                  
+        }                  
+        function triggerFolderDelete() {                  
+            pendingDeleteContext = { type: "folder", folderId: selectedFolderId };                  
+            document.getElementById("modal-delete-confirm").classList.remove("hidden");                  
+        }                  
+        function openSetAddModal() { document.getElementById("set-name-input").value = ""; document.getElementById("modal-set-add").classList.remove("hidden"); }                  
+        function closeSetAddModal() { document.getElementById("modal-set-add").classList.add("hidden"); }                  
+        function createNewSet() {                  
+            const name = document.getElementById("set-name-input").value.trim();                  
+            if(!name) return;                  
+            const folder = appData.folders.find(f => String(f.id) === String(selectedFolderId));                  
+            folder.sets.push({ id: "set_" + Date.now(), name: name, count: 0, cards: { MEMORIZE: [], SEQUENCE: [], CLASSIFY: [] } });                  
+            saveToLocalStorage(); renderFolderDetail(selectedFolderId); closeSetAddModal();                  
+        }                  
+        function triggerSetDelete() {                  
+            pendingDeleteContext = { type: "set", folderId: selectedFolderId, setId: selectedSetId };                  
+            document.getElementById("modal-delete-confirm").classList.remove("hidden");                  
+        }                  
+        function closeDeleteConfirmModal() { document.getElementById("modal-delete-confirm").classList.add("hidden"); }                  
+              
+        function executeConfirmedDeletion() {                  
+            if (pendingDeleteContext.type === "folder") {                  
+                appData.folders = appData.folders.filter(f => String(f.id) !== String(pendingDeleteContext.folderId));                  
+                saveToLocalStorage(); goHome();                  
+            } else {                  
+                const folder = appData.folders.find(f => String(f.id) === String(pendingDeleteContext.folderId));                  
+                if (folder) {                  
+                    folder.sets = folder.sets.filter(s => String(s.id) !== String(pendingDeleteContext.setId));                  
+                    saveToLocalStorage();       
+                    renderFolderDetail(selectedFolderId);       
+                    changeView("view-folder-detail", false);                  
+                }                  
+            }                  
+            closeDeleteConfirmModal();                  
+        }                  
+                  
+        function renderSetDetail(setId) {                  
+            const set = findSetById(selectedSetId);                  
+            if (!set) {                  
+                goHome();                  
+                return;                  
+            }                  
+            document.getElementById("current-set-title").innerText = set.name;                  
+            document.getElementById("current-set-count").innerText = set.count || 0;                  
+                  
+            updateDifficultyUI();                  
+            checkActiveSessionResume(setId);                  
+        }                  
+                  
+        function setDifficulty(diff) {                  
+            currentDifficulty = diff;                  
+            updateDifficultyUI();                  
+            checkActiveSessionResume(selectedSetId);                  
+        }                  
+                  
+        function updateDifficultyUI() {                  
+            const btnMe = document.getElementById("diff-me-btn");                  
+            const btnMo = document.getElementById("diff-mo-btn");                  
+            const btnRe = document.getElementById("diff-re-btn");                  
+            if (!btnMe || !btnMo || !btnRe) return;                  
+                  
+            const buttons = [                  
+                { key: 'ME', el: btnMe },                  
+                { key: 'MO', el: btnMo },                  
+                { key: 'RE', el: btnRe }                  
+            ];                  
+                  
+            buttons.forEach(btn => {                  
+                if (currentDifficulty === btn.key) {                  
+                    if (currentTheme === "dark") {                  
+                        btn.el.className = "px-3.5 py-1.5 text-xs font-bold bg-neutral-100 text-neutral-900 transition-all";                  
+                    } else if (currentTheme === "ruri") {                  
+                        btn.el.className = "px-3.5 py-1.5 text-xs font-bold bg-[#2b4c59] text-white transition-all";                  
+                    }
+else {                  
+                        btn.el.className = "px-3.5 py-1.5 text-xs font-bold bg-neutral-900 text-white transition-all";                  
+                    }                  
+                } else {                  
+                    if (currentTheme === "dark") {                  
+                        btn.el.className = "px-3.5 py-1.5 text-xs font-bold bg-neutral-800 text-neutral-400 hover:bg-neutral-700 transition-all";                  
+                    } else if (currentTheme === "ruri") {                  
+                        btn.el.className = "px-3.5 py-1.5 text-xs font-bold bg-neutral-100 text-[#2b4c59] hover:bg-neutral-200 transition-all";                  
+                    }
+else {                  
+                        btn.el.className = "px-3.5 py-1.5 text-xs font-bold bg-white text-neutral-700 hover:bg-neutral-100 transition-all";                  
+                    }                  
+                }                  
+            });                  
+        }                  
+                  
+        // ==================== [자바스크립트 완전 복구 영역] ====================  
+  
+        function findSetById(id) {                  
+            for (let f of appData.folders) {   
+                const s = f.sets.find(set => String(set.id) === String(id));   
+                if (s) return s;   
+            }   
+            return null;                  
+        }  
+  
+        function checkActiveSessionResume(setId) {                  
+            const banner = document.getElementById("resume-banner");                  
+            if (!banner) return;                  
+            const modes = ["MEMORIZE", "SEQUENCE", "CLASSIFY"];                  
+            let foundSession = null;                  
+            let foundMode = "";                  
+                  
+            for (let mode of modes) {                  
+                const sessionKey = `${setId}_${mode}_${currentDifficulty}`;                  
+                if (studySessions[sessionKey]) {                  
+                    foundSession = studySessions[sessionKey];                  
+                    foundMode = mode;                  
+                    break;                  
+                }                  
+            }                  
+                  
+            if (foundSession) {                  
+                banner.classList.remove("hidden");                  
+                let modeKor = foundMode === "MEMORIZE" ? "암기" : foundMode === "SEQUENCE" ? "배열" : "분류";                  
+                let diffKor = "메";                  
+                if (currentDifficulty === "MO") diffKor = "모";                  
+                else if (currentDifficulty === "RE") diffKor = "RE";                  
+                let detailText = `진행 정보 - 모드: ${modeKor} | 난이도: ${diffKor}`;                  
+                document.getElementById("resume-details").innerText = detailText;                  
+                activeSession = {                  
+                    key: `${setId}_${foundMode}_${currentDifficulty}`,                  
+                    mode: foundMode,                  
+                    sessionData: foundSession                  
+                };                  
+            } else {                  
+                banner.classList.add("hidden");                  
+                activeSession = null;                  
+            }                  
+        }                  
+                  
+        function startStudy(mode) {                  
+            const set = findSetById(selectedSetId);                  
+            if (!set || !set.cards || !set.cards[mode] || set.cards[mode].length === 0) {                  
+                customAlert("해당 모드의 데이터 카드가 비어 있습니다.\n데이터 관리 탭에서 단어 및 상세 정보를 등록하세요.");                  
+                return;                  
+            }                  
+            const sessionKey = `${selectedSetId}_${mode}_${currentDifficulty}`;                  
+            delete studySessions[sessionKey];                  
+            saveSessionsToLocalStorage();                  
+                  
+            if (mode === "MEMORIZE") initMemorizeStudy(false);                  
+            else if (mode === "SEQUENCE") initSequenceStudy(false);                  
+            else if (mode === "CLASSIFY") initClassifyStudy(false);                  
+        }                  
+                  
+        function resumeStudy() {                  
+            if (!activeSession) return;                  
+            const mode = activeSession.mode;                  
+            if (mode === "MEMORIZE") initMemorizeStudy(true);                  
+            else if (mode === "SEQUENCE") initSequenceStudy(true);                  
+            else if (mode === "CLASSIFY") initClassifyStudy(true);                  
+        }                  
+                  
+        function clearResumeData() {                  
+            if (activeSession) {                  
+                delete studySessions[activeSession.key];                  
+                saveSessionsToLocalStorage();                  
+                checkActiveSessionResume(selectedSetId);                  
+            }                  
+        }                  
+                  
+        function shuffle(arr) {                  
+            if (!Array.isArray(arr)) return [];                  
+            const result = [...arr];                  
+            for (let i = result.length - 1; i > 0; i--) {                  
+                const j = Math.floor(Math.random() * (i + 1));                  
+                const temp = result[i];                  
+                result[i] = result[j];                  
+                result[j] = temp;                  
+            }                  
+            return result;                  
+        }  
+  
+        // ==================== [A] 암기 모드 ====================                  
+        let currentMemorizeIndex = 0; let memorizeList = []; let unlearnedMemorizeList = [];                  
+        let isCardFlipped = false; let totalMemorizeInitialCount = 0;                  
+                  
+        function initMemorizeStudy(isResume) {                  
+            const set = findSetById(selectedSetId);                  
+            const key = `${selectedSetId}_MEMORIZE_${currentDifficulty}`;                  
+            document.getElementById("memorize-diff-label").innerText = currentDifficulty;                  
+                              
+            const inputArea = document.getElementById("memorize-input-area");                  
+            if (inputArea) {                  
+                inputArea.classList.toggle("hidden", currentDifficulty === "ME");                  
+            }                  
+                  
+            if (isResume && studySessions[key]) {                  
+                const s = studySessions[key];                  
+                memorizeList = s.currentPool; unlearnedMemorizeList = s.unlearned;                  
+                currentMemorizeIndex = s.currentIndex; totalMemorizeInitialCount = s.totalInitial;                  
+            } else {                  
+                memorizeList = shuffle([...set.cards.MEMORIZE]); unlearnedMemorizeList = [];                  
+                currentMemorizeIndex = 0; totalMemorizeInitialCount = memorizeList.length;                  
+                studySessions[key] = { currentPool: memorizeList, unlearned: unlearnedMemorizeList, currentIndex: 0, totalInitial: totalMemorizeInitialCount };                  
+                saveSessionsToLocalStorage();                  
+            }                  
+            renderMemorizeCard();                  
+            changeView("view-study-memorize");                  
+                              
+            setTimeout(initSwipeEvents, 100);                  
+        }                  
+                  
+        function renderMemorizeCard() {                  
+            if (currentMemorizeIndex >= memorizeList.length) {                  
+                if (unlearnedMemorizeList.length > 0) {                  
+                    customAlert("못 외운 카드를 재복습합니다.");                  
+                    memorizeList = shuffle([...unlearnedMemorizeList]); unlearnedMemorizeList = [];                  
+                    currentMemorizeIndex = 0; renderMemorizeCard();                  
+                } else { completeStudy(); }                  
+                return;                  
+            }                  
+            const card = memorizeList[currentMemorizeIndex];                  
+            const frontEl = document.getElementById("memorize-front-text");                  
+            const backEl = document.getElementById("memorize-back-text");                  
+            const frontTag = document.getElementById("memorize-front-tag");                  
+            const backTag = document.getElementById("memorize-back-tag");                  
+            const backTip = document.getElementById("memorize-back-tip");                  
+            const inputLabel = document.getElementById("memorize-input-label");                  
+            const userInput = document.getElementById("memorize-user-input");                  
+                  
+            if (currentDifficulty === "RE") {                  
+                // RE 모드: 뜻과 단어의 앞뒤를 완벽히 거꾸로                  
+                frontEl.innerText = card.back;                  
+                backEl.innerText = card.front;                  
+                frontTag.innerText = "Back (뜻/뒷면이 먼저 나옴)";                  
+                backTag.innerText = "Front (원래 단어/앞면)";                  
+                backTip.innerText = "외우셨다면 오른쪽, 모르면 왼쪽 슬라이드";                  
+                if (inputLabel) inputLabel.innerText = "원래 단어(앞면) 직접 입력";                  
+                if (userInput) userInput.placeholder = "원래 단어(앞면)를 입력해 주세요";                  
+            } else {                  
+                // 일반 및 모 모드: 원래 순서대로                  
+                frontEl.innerText = card.front;                  
+                backEl.innerText = card.back;                  
+                frontTag.innerText = "Front (앞면)";                  
+                backTag.innerText = "Back (뒷면 / 뜻)";                  
+                backTip.innerText = "외우셨다면 오른쪽, 모르면 왼쪽 슬라이드";                  
+                if (inputLabel) inputLabel.innerText = "답변 직접 입력";                  
+                if (userInput) userInput.placeholder = "정답(뒷면)을 입력해 주세요";                  
+            }                  
+                  
+            document.getElementById("memorize-left-count").innerText = memorizeList.length - currentMemorizeIndex;                  
+                              
+            const percentage = ((totalMemorizeInitialCount - (memorizeList.length - currentMemorizeIndex)) / totalMemorizeInitialCount) * 100;                  
+            const progressBar = document.getElementById("memorize-progress-bar");                  
+            if (progressBar) progressBar.style.width = `${percentage}%`;                  
+                  
+            const dragContainer = document.getElementById("memorize-drag-container");                  
+            if (dragContainer) {                  
+                dragContainer.style.transition = "none"; dragContainer.style.transform = "none"; dragContainer.style.opacity = "1";                  
+            }                  
+            isCardFlipped = false;                  
+            const cardInner = document.getElementById("memorize-flip-card-inner");                  
+            if (cardInner) cardInner.classList.remove("flipped");                  
+                  
+            if (currentDifficulty !== "ME") {                  
+                const inp = document.getElementById("memorize-user-input");                  
+                if (inp) inp.value = "";                  
+                const fdb = document.getElementById("memorize-feedback");                  
+                if (fdb) fdb.classList.add("hidden");                  
+            }                  
+        }                  
+                  
+        function flipCurrentCard() {                  
+            isCardFlipped = !isCardFlipped;                  
+            const cardInner = document.getElementById("memorize-flip-card-inner");                  
+            if (cardInner) {                  
+                cardInner.classList.toggle("flipped", isCardFlipped);                  
+            }                  
+        }                  
+                  
+        function handleMemorizeDecisionWithAnim(didMemorize) {                  
+            const dragContainer = document.getElementById("memorize-drag-container");                  
+            if (!dragContainer) return;                  
+            dragContainer.style.transition = "transform 0.4s ease, opacity 0.4s ease";                  
+            dragContainer.style.transform = `translate3d(${didMemorize ? window.innerWidth : -window.innerWidth}px, 0, 0) rotate(${didMemorize ? 10 : -10}deg)`;                  
+            dragContainer.style.opacity = "0";                  
+            setTimeout(() => {                  
+                if (!didMemorize) unlearnedMemorizeList.push(memorizeList[currentMemorizeIndex]);                  
+                currentMemorizeIndex++;                  
+                const key = `${selectedSetId}_MEMORIZE_${currentDifficulty}`;                  
+                if (studySessions[key]) { studySessions[key].currentIndex = currentMemorizeIndex; studySessions[key].unlearned = unlearnedMemorizeList; saveSessionsToLocalStorage(); }                  
+                renderMemorizeCard();                  
+            }, 350);                  
+        }                  
+                  
+        function checkMemorizeInput() {                  
+            const userInput = document.getElementById("memorize-user-input");                  
+            const input = userInput ? userInput.value.trim() : "";                  
+            const card = memorizeList[currentMemorizeIndex];                  
+            if (!input) return;                  
+            if (!isCardFlipped) flipCurrentCard();                  
+                  
+            // RE 난이도면 정답 타겟이 card.front 가 되고, 모 난이도면 card.back 이 됨                  
+            const answerTarget = currentDifficulty === "RE" ? card.front : card.back;                  
+            const isCorrect = input.toLowerCase() === answerTarget.toLowerCase();                  
+            const f = document.getElementById("memorize-feedback");                   
+            if (f) {                  
+                f.classList.remove("hidden");                  
+                f.innerText = isCorrect ? "✓ 정답입니다!" : `✗ 오답 (정답: ${answerTarget})`;                  
+                f.className = isCorrect ? "p-3 border rounded text-xs bg-emerald-50/10 text-emerald-300 border-emerald-500/40 font-bold" : "p-3 border rounded text-xs bg-rose-50/10 text-rose-300 border-rose-500/40 font-bold";                  
+            }                  
+            setTimeout(() => handleMemorizeDecisionWithAnim(isCorrect), 1200);                  
+        }                  
+                  
+        function initSwipeEvents() {                  
+            const wrapper = document.getElementById("memorize-card-wrapper");                  
+            const dragContainer = document.getElementById("memorize-drag-container");                  
+            if (!dragContainer || !wrapper) return;                   
+                              
+            const onStart = (e) => {                  
+                if (currentView !== "view-study-memorize" || currentDifficulty !== "ME") return;                  
+                                  
+                if (e.type.startsWith('touch') && e.cancelable) {                  
+                    e.preventDefault();                  
+                }                  
+                  
+                isMoving = true;                   
+                isDraggedSignificant = false;                   
+                dragStartTime = Date.now();                  
+                dragContainer.style.transition = "none";                  
+                                  
+                const p = e.touches ? e.touches[0] : e;                  
+                startX = p.clientX; startY = p.clientY; currentX = p.clientX; currentY = p.clientY;                  
+            };                  
+            const onMove = (e) => {                  
+                if (!isMoving) return;                  
+                const p = e.touches ? e.touches[0] : e;                  
+                currentX = p.clientX; currentY = p.clientY;                  
+                const dx = currentX - startX; const dy = currentY - startY;                  
+                const dist = Math.sqrt(dx * dx + dy * dy);                  
+                                  
+                if (dist > 6) { isDraggedSignificant = true; if (e.cancelable) e.preventDefault(); }                  
+                if (isDraggedSignificant) {                  
+                    const rotate = dx * 0.03;                  
+                    dragContainer.style.transform = `translate3d(${dx}px, ${dy * 0.3}px, 0) rotate(${rotate}deg)`;                  
+                }                  
+            };                  
+            const onEnd = (e) => {                  
+                if (!isMoving) return; isMoving = false;                  
+                                  
+                const dx = currentX - startX;                  
+                const dy = currentY - startY;                  
+                const dist = Math.sqrt(dx * dx + dy * dy);                  
+                const duration = Date.now() - dragStartTime;                  
+                  
+                if (!isDraggedSignificant || dist < 6 || duration < 80) {                   
+                    flipCurrentCard();                   
+                    return;                   
+                }                  
+                  
+                const swipeThreshold = 80;                  
+                if (dx > swipeThreshold) handleMemorizeDecisionWithAnim(true);                  
+                else if (dx < -swipeThreshold) handleMemorizeDecisionWithAnim(false);                  
+                else {                  
+                    dragContainer.style.transition = "transform 0.3s ease"; dragContainer.style.transform = "none";                  
+                }                  
+            };                  
+                              
+            wrapper.removeAttribute("onclick");                  
+                              
+            wrapper.removeEventListener("mousedown", onStart);                  
+            wrapper.addEventListener("mousedown", onStart);                  
+                              
+            window.removeEventListener("mousemove", onMove);                  
+            window.addEventListener("mousemove", onMove);                  
+                              
+            window.removeEventListener("mouseup", onEnd);                  
+            window.addEventListener("mouseup", onEnd);                  
+                              
+            wrapper.removeEventListener("touchstart", onStart);                  
+            wrapper.addEventListener("touchstart", onStart, { passive: false });                  
+                              
+            window.removeEventListener("touchmove", onMove);                  
+            window.addEventListener("touchmove", onMove, { passive: false });                  
+                              
+            window.removeEventListener("touchend", onEnd);                  
+            wrapper.addEventListener("touchend", onEnd, { passive: false });                  
+        }                  
+                  
+        // ==================== [B] 배열 모드 ====================                  
+        let sequenceItems = []; let originalSequence = [];                  
+        let draggingElement = null;                  
+        let draggingIdx = -1;                  
+        function initSequenceStudy(isResume) {                  
+            const set = findSetById(selectedSetId);                  
+            const key = `${selectedSetId}_SEQUENCE_${currentDifficulty}`;                  
+            document.getElementById("sequence-diff-label").innerText = currentDifficulty;                  
+                              
+            const fdb = document.getElementById("sequence-feedback");                  
+            if (fdb) fdb.classList.add("hidden");                  
+            const gmo = document.getElementById("seq-guide-mo");                  
+            if (gmo) gmo.classList.toggle("hidden", currentDifficulty !== "MO");                  
+            const gre = document.getElementById("seq-guide-re");                  
+            if (gre) gre.classList.toggle("hidden", currentDifficulty !== "RE");                  
+                                  
+            originalSequence = [...set.cards.SEQUENCE];                  
+            if (isResume && studySessions[key]) {                  
+                sequenceItems = studySessions[key].items;                  
+            } else {                  
+                sequenceItems = shuffle([...originalSequence]).map((item, idx) => ({                   
+                    id: `seq_${idx}`,                   
+                    text: item.text,                   
+                    correctDesc: item.desc,                  
+                    userDescInput: "",                  
+                    userTextInput: ""                   
+                }));                  
+                studySessions[key] = { items: sequenceItems }; saveSessionsToLocalStorage();                  
+            }                  
+            renderSequenceList(); changeView("view-study-sequence");                  
+        }                  
+                                  
+        function renderSequenceList() {                  
+            const container = document.getElementById("sequence-list-container"); if (!container) return; container.innerHTML = "";                  
+            sequenceItems.forEach((item, idx) => {                  
+                const div = document.createElement("div");                  
+                div.setAttribute("data-index", idx);                  
+                div.className = "drag-item border border-neutral-950/40 p-4 rounded app-card-bg flex flex-col gap-2 shadow-sm text-inherit";                  
+                                                  
+                let innerHTML = "";                  
+                if (currentDifficulty === "RE") {                  
+                    innerHTML = `                  
+                        <div class="flex items-center justify-between pointer-events-none select-none">                  
+                            <div class="flex items-center gap-2 flex-1 min-w-0 mr-2">                  
+                                <span class="font-mono text-xs opacity-40 shrink-0">#${idx+1}</span>                  
+                                <span class="text-sm font-bold truncate opacity-80">${escapeHtml(item.correctDesc || '설명 없음')}</span>                  
+                            </div>                  
+                            <span class="opacity-40 text-xs shrink-0">☰ 드래그</span>                  
+                        </div>                  
+                        <div class="mt-1">                  
+                            <input type="text" placeholder="이 설명에 어울리는 원래 '명칭(단어)'을 입력하세요" value="${escapeHtml(item.userTextInput || '')}" class="app-input w-full border p-1.5 text-xs rounded focus:outline-none" onchange="updateSeqText(${idx}, this.value)">                  
+                        </div>                  
+                    `;                  
+                } else {                  
+                    innerHTML = `                  
+                        <div class="flex items-center justify-between pointer-events-none select-none">                  
+                            <div class="flex items-center gap-2">                  
+                                <span class="font-mono text-xs opacity-40">#${idx+1}</span>                  
+                                <span class="text-sm font-bold">${escapeHtml(item.text)}</span>                  
+                            </div>                  
+                            <span class="opacity-40 text-xs">☰ 드래그</span>                  
+                        </div>                  
+                    `;                  
+                    if (currentDifficulty === "MO") {                  
+                        innerHTML += `                  
+                            <div class="mt-1">                  
+                                <input type="text" placeholder="이 항목의 뜻/설명을 설명해 보세요" value="${escapeHtml(item.userDescInput || '')}" class="app-input w-full border p-1.5 text-xs rounded focus:outline-none" onchange="updateSeqDesc(${idx}, this.value)">                  
+                            </div>                  
+                        `;                          
+                    }                  
+                }                  
+                div.innerHTML = innerHTML;                  
+                setupDragDropItem(div);                  
+                container.appendChild(div);                  
+            });                  
+        }                  
+                  
+        function setupDragDropItem(element) {                  
+            const container = document.getElementById("sequence-list-container");                  
+            if (!container) return;                  
+            const getMouseY = (e) => e.touches ? e.touches[0].clientY : e.clientY;                  
+                                  
+            const onStart = (e) => {                  
+                draggingElement = element; draggingIdx = parseInt(element.getAttribute("data-index"));                  
+                element.classList.add("dragging");                  
+            };                  
+            const onMove = (e) => {                  
+                if (!draggingElement || draggingElement !== element) return;                  
+                const clientY = getMouseY(e);                  
+                const siblings = [...container.querySelectorAll(".drag-item:not(.dragging)")];                  
+                const next = siblings.find(sibling => {                  
+                    const box = sibling.getBoundingClientRect();                  
+                    return clientY < box.top + box.height / 2;                  
+                });                  
+                if (next) container.insertBefore(draggingElement, next);                  
+                else container.appendChild(draggingElement);                  
+                if (e.cancelable) e.preventDefault();                  
+            };                  
+            const onEnd = () => {                  
+                if (!draggingElement) return;                  
+                draggingElement.classList.remove("dragging");                  
+                const currentDOMItems = [...container.querySelectorAll(".drag-item")];                  
+                sequenceItems = currentDOMItems.map(domEl => sequenceItems[parseInt(domEl.getAttribute("data-index"))]);                  
+                draggingElement = null; draggingIdx = -1;                  
+                                  
+                const sessionKey = `${selectedSetId}_SEQUENCE_${currentDifficulty}`;                  
+                if (studySessions[sessionKey]) { studySessions[sessionKey].items = sequenceItems; saveSessionsToLocalStorage(); }                  
+                renderSequenceList();                  
+            };                  
+                                  
+            element.addEventListener("mousedown", onStart);                  
+            window.addEventListener("mousemove", onMove);                  
+            window.addEventListener("mouseup", onEnd);                  
+            element.addEventListener("touchstart", onStart, { passive: false });                  
+            window.addEventListener("touchmove", onMove, { passive: false });                  
+            window.addEventListener("touchend", onEnd);                  
+        }                  
+                                  
+        function checkSequenceAnswer() {                  
+            let isOrderCorrect = true;                  
+            let isContentCorrect = true;                  
+                                  
+            for(let i=0; i<sequenceItems.length; i++) {                  
+                if (sequenceItems[i].text !== originalSequence[i].text) {                   
+                    isOrderCorrect = false;                   
+                }                  
+                                                  
+                if (currentDifficulty === "MO") {                  
+                    const userDesc = sequenceItems[i].userDescInput.trim().toLowerCase();                  
+                    const actualDesc = sequenceItems[i].correctDesc ? sequenceItems[i].correctDesc.trim().toLowerCase() : "";                  
+                    if (!userDesc || !actualDesc.includes(userDesc)) {                   
+                        isContentCorrect = false;                   
+                    }                  
+                } else if (currentDifficulty === "RE") {                  
+                    const userText = sequenceItems[i].userTextInput.trim().toLowerCase();                  
+                    const actualText = sequenceItems[i].text.trim().toLowerCase();                  
+                    if (userText !== actualText) {                   
+                        isContentCorrect = false;                   
+                    }                  
+                }                  
+            }                  
+                                  
+            const f = document.getElementById("sequence-feedback"); if (f) f.classList.remove("hidden");                  
+            if (isOrderCorrect && isContentCorrect) {                  
+                if (f) {                  
+                    f.className = "p-4 border rounded text-xs bg-emerald-50/10 text-emerald-300 border-emerald-500/40 font-bold text-center";                  
+                    f.innerText = "✓ 순서와 설명 기술이 모두 완벽합니다!";                  
+                }                  
+                setTimeout(() => {                   
+                    delete studySessions[`${selectedSetId}_SEQUENCE_${currentDifficulty}`];                   
+                    saveSessionsToLocalStorage();                   
+                    completeStudy();                   
+                }, 1500);                  
+            } else {                  
+                if (f) {                  
+                    f.className = "p-4 border rounded text-xs bg-rose-50/10 text-rose-300 border-rose-500/40 font-bold text-center";                  
+                    let errHtml = `&times; 정답 조건에 맞지 않습니다.<br>`;                  
+                    if (!isOrderCorrect) errHtml += `- 순서 배치 오류가 있습니다.<br>`;                  
+                    if (!isContentCorrect) {                  
+                        if (currentDifficulty === "RE") {                  
+                            errHtml += `- 각 상세 설명에 알맞은 명칭이 부정확하거나 누락되었습니다.`;                  
+                        } else {                  
+                            errHtml += `- 뜻 설명이 미흡하거나 누락되었습니다.`;                  
+                        }                  
+                    }                  
+                    f.innerHTML = errHtml;                  
+                }                  
+            }                  
+        }                  
+                  
+        // ==================== [C] 분류 모드 ====================                  
+        let currentClassifyIndex = 0; let classifyList = []; let unlearnedClassifyList = [];                  
+        let categories = []; let isClassifyCardFlipped = false;                  
+                  
+        function initClassifyStudy(isResume) {                  
+            const set = findSetById(selectedSetId);                  
+            const key = `${selectedSetId}_CLASSIFY_${currentDifficulty}`;                  
+            document.getElementById("classify-diff-label").innerText = currentDifficulty;                  
+                              
+            const fdb = document.getElementById("classify-feedback");                  
+            if (fdb) fdb.classList.add("hidden");                  
+            categories = [...new Set(set.cards.CLASSIFY.map(c => c.group.trim()))];                  
+                                  
+            if (isResume && studySessions[key]) {                  
+                const s = studySessions[key];                  
+                classifyList = s.currentPool; unlearnedClassifyList = s.unlearned;                  
+                currentClassifyIndex = s.currentIndex;                  
+            } else {                  
+                classifyList = shuffle([...set.cards.CLASSIFY]); unlearnedClassifyList = [];                  
+                currentClassifyIndex = 0;                  
+                studySessions[key] = { currentPool: classifyList, unlearned: unlearnedClassifyList, currentIndex: 0 }; saveSessionsToLocalStorage();                  
+            }                  
+            renderClassifyCard(); changeView("view-study-classify");                  
+        }                  
+                                  
+        function renderClassifyCard() {                  
+            if (currentClassifyIndex >= classifyList.length) {                  
+                if (unlearnedClassifyList.length > 0) {                  
+                    customAlert("틀린 분류 카드를 재도전합니다.");                  
+                    classifyList = shuffle([...unlearnedClassifyList]); unlearnedClassifyList = [];                  
+                    currentClassifyIndex = 0; renderClassifyCard();                  
+                } else { completeStudy(); }                  
+                return;                  
+            }                  
+            const card = classifyList[currentClassifyIndex];                  
+            const nameEl = document.getElementById("classify-card-name");                  
+            const descEl = document.getElementById("classify-card-desc");                  
+            const frontTag = document.getElementById("classify-front-tag");                  
+            const backTag = document.getElementById("classify-back-tag");                  
+                                  
+            if (currentDifficulty === "RE") {                  
+                nameEl.innerText = card.desc;                  
+                descEl.innerText = card.card;                  
+                if (frontTag) frontTag.innerText = "DESCRIPTION (뜻 / 상세 설명)";                  
+                if (backTag) backTag.innerText = "CLASSIFY TARGET NAME (원래 카드명)";                  
+            } else {                  
+                nameEl.innerText = card.card;                  
+                descEl.innerText = card.desc;                  
+                if (frontTag) frontTag.innerText = "CLASSIFY TARGET (분류 카드)";                  
+                if (backTag) backTag.innerText = "DESCRIPTION / HINT (뜻 상세)";                  
+            }                  
+                                  
+            const lft = document.getElementById("classify-left-count");                  
+            if (lft) lft.innerText = classifyList.length - currentClassifyIndex;                  
+                                              
+            isClassifyCardFlipped = false;                   
+            const inner = document.getElementById("classify-flip-card-inner");                  
+            if (inner) inner.classList.remove("flipped");                  
+            const fdb = document.getElementById("classify-feedback");                  
+            if (fdb) fdb.classList.add("hidden");                  
+                                  
+            const btnContainer = document.getElementById("classify-category-buttons"); if (btnContainer) { btnContainer.innerHTML = "";                  
+                categories.forEach(cat => {                  
+                    const btn = document.createElement("button");                  
+                    if (false) {                  
+                        btn.className = "border border-[#ffd82b]/30 py-3 text-xs font-bold hover:bg-[#ffd82b]/10 rounded bg-[#0b1530] text-[#ffd82b] transition-all shadow-[0_0_8px_rgba(255,216,43,0.1)]";                  
+                    } else {                  
+                        btn.className = "border border-neutral-900/40 py-3 text-xs font-bold hover:bg-neutral-500/5 rounded bg-white/5 text-inherit transition-all";                  
+                    }                  
+                    btn.innerText = cat; btn.onclick = (e) => { e.stopPropagation(); submitClassifySelection(cat); };                  
+                    btnContainer.appendChild(btn);                  
+                });                  
+            }                  
+        }                  
+                  
+        function flipClassifyCard() {                  
+            isClassifyCardFlipped = !isClassifyCardFlipped;                  
+            const inner = document.getElementById("classify-flip-card-inner");                  
+            if (inner) inner.classList.toggle("flipped", isClassifyCardFlipped);                  
+        }                  
+                                  
+        function submitClassifySelection(cat) {                  
+            const card = classifyList[currentClassifyIndex];                  
+            const isCorrect = cat.trim() === card.group.trim();                  
+            const f = document.getElementById("classify-feedback"); if (f) f.classList.remove("hidden");                  
+                                              
+            if (!isClassifyCardFlipped) flipClassifyCard();                  
+                                  
+            if (isCorrect) {                  
+                if (f) {                  
+                    f.className = "p-3 border rounded text-xs bg-emerald-50/10 text-emerald-300 border-emerald-500/40 font-bold";                  
+                    f.innerText = `✓ 정답! 대분류: [${card.group}]`;                  
+                }                  
+                setTimeout(() => handleClassifyNext(true), 1200);                  
+            } else {                  
+                if (f) {                  
+                    f.className = "p-3 border rounded text-xs bg-rose-50/10 border-rose-300/40 text-rose-300 font-bold";                  
+                    f.innerText = `✗ 오답 (정답 대분류: [${card.group}])`;                  
+                }                  
+                setTimeout(() => handleClassifyNext(false), 2000);                  
+            }                  
+        }                  
+                                  
+        function handleClassifyNext(success) {                  
+            if (!success) unlearnedClassifyList.push(classifyList[currentClassifyIndex]);                  
+            currentClassifyIndex++;                  
+            const key = `${selectedSetId}_CLASSIFY_${currentDifficulty}`;                  
+            if (studySessions[key]) { studySessions[key].currentIndex = currentClassifyIndex; studySessions[key].unlearned = unlearnedClassifyList; saveSessionsToLocalStorage(); }                  
+            renderClassifyCard();                  
+        }                  
+                  
+        // ==================== [D] 학습 완료 화면 및 데이터 세부 관리 ====================                  
+        let currentEditingTab = "MEMORIZE";                  
+                  
+        function completeStudy() {
+            const set = findSetById(selectedSetId);
+            if (!set) return;
+            set.count = (set.count || 0) + 1;
+            saveToLocalStorage();
+            for (const m of ["MEMORIZE","SEQUENCE","CLASSIFY"]) delete studySessions[`${selectedSetId}_${m}_${currentDifficulty}`];
+            saveSessionsToLocalStorage();
+
+            const before = document.getElementById("complete-count-before");
+            const after = document.getElementById("complete-count-after");
+            if (before) before.innerText = set.count - 1;
+            if (after) after.innerText = set.count;
+
+            const ruriImg = document.getElementById("complete-ruri-img");
+            const ruriFallback = document.getElementById("complete-ruri-fallback");
+            if (currentTheme === "ruri" && ruriImg && ruriFallback) {
+                ruriImg.classList.remove("hidden");
+                ruriFallback.classList.add("hidden");
+                const ruriImages = ["./ruri/ruri1.JPG", "./ruri/ruri2.WEBP"];
+                const selectedImg = ruriImages[Math.floor(Math.random() * ruriImages.length)];
+                ruriImg.src = selectedImg;
+                ruriImg.onerror = function() { handleRuriImgError(); };
+            } else if (ruriImg && ruriFallback) {
+                ruriImg.classList.add("hidden");
+                ruriImg.removeAttribute("src");
+                ruriFallback.classList.remove("hidden");
+            }
+            changeView("view-study-complete");
+        }
+
+        function handleRuriImgError() {                  
+            const ruriImg = document.getElementById("complete-ruri-img");                  
+            const ruriFallback = document.getElementById("complete-ruri-fallback");                  
+            if (ruriImg && ruriFallback) {                  
+                ruriImg.classList.add("hidden");                  
+                ruriFallback.classList.remove("hidden");                  
+            }                  
+        }                  
+                                  
+        function goToCurrentSetDetail() { renderSetDetail(selectedSetId); changeView("view-set-detail"); }                  
+        function openSetDataEdit() { currentEditingTab = "MEMORIZE"; switchDataTab("MEMORIZE"); changeView("view-data-edit"); }                  
+        function saveAndExitDataEdit() { renderSetDetail(selectedSetId); changeView("view-set-detail"); }                  
+                                  
+        function switchDataTab(tab) {                  
+            currentEditingTab = tab; cancelEditCard();                  
+            ["MEMORIZE","SEQUENCE","CLASSIFY"].forEach(t => {                  
+                const btn = document.getElementById(`tab-btn-${t.toLowerCase()}`);                  
+                const content = document.getElementById(`data-tab-content-${t.toLowerCase()}`);                  
+                if (btn && content) {                  
+                    btn.className = t === tab ? "flex-1 py-2 text-xs font-bold text-center border-b-2 border-neutral-900 text-inherit" : "flex-1 py-2 text-xs font-bold text-center border-b-2 border-transparent opacity-40";                  
+                    content.classList.toggle("hidden", t !== tab);                  
+                }                  
+            });                  
+            renderDataEditTab();                  
+        }                  
+                                  
+        function saveEditCard(mode, index) {                  
+            const set = findSetById(selectedSetId);                  
+            if (!set) return;                  
+                                  
+            if (mode === 'MEMORIZE') {                  
+                const fVal = document.getElementById(`edit-mem-front-${index}`).value.trim();                  
+                const bVal = document.getElementById(`edit-mem-back-${index}`).value.trim();                  
+                if (!fVal || !bVal) { customAlert("내용을 비워둘 수 없습니다."); return; }                  
+                set.cards.MEMORIZE[index].front = fVal;                  
+                set.cards.MEMORIZE[index].back = bVal;                  
+            } else if (mode === 'SEQUENCE') {                  
+                const tVal = document.getElementById(`edit-seq-text-${index}`).value.trim();                  
+                const dVal = document.getElementById(`edit-seq-desc-${index}`).value.trim();                  
+                if (!tVal) { customAlert("항목명을 비워둘 수 없습니다."); return; }                  
+                set.cards.SEQUENCE[index].text = tVal;                  
+                set.cards.SEQUENCE[index].desc = dVal;                  
+            } else if (mode === 'CLASSIFY') {                  
+                const cVal = document.getElementById(`edit-cls-card-${index}`).value.trim();                  
+                const gVal = document.getElementById(`edit-cls-group-${index}`).value.trim();                  
+                const dVal = document.getElementById(`edit-cls-desc-${index}`).value.trim();                  
+                if (!cVal || !gVal) { customAlert("카드명과 대분류명을 적어주세요."); return; }                  
+                set.cards.CLASSIFY[index].card = cVal;                  
+                set.cards.CLASSIFY[index].group = gVal;                  
+                set.cards.CLASSIFY[index].desc = dVal;                  
+            }                  
+            saveToLocalStorage();                  
+            cancelEditCard();                  
+            renderDataEditTab();                  
+            customAlert("수정되었습니다.");                  
+        }                  
+                                  
+        function startEditCard(mode, index) { editState.mode = mode; editState.index = index; renderDataEditTab(); }                  
+        function cancelEditCard() { editState.mode = null; editState.index = null; }                  
+                                  
+        function renderDataEditTab() {                  
+            const set = findSetById(selectedSetId); if (!set) return;                  
+                                              
+            if (currentEditingTab === "MEMORIZE") {                  
+                const list = document.getElementById("data-list-memorize"); if (list) { list.innerHTML = "";                  
+                    const cardList = set.cards.MEMORIZE || [];                  
+                    if (cardList.length === 0) list.innerHTML = `<p class="text-[11px] opacity-40 text-center py-4">등록된 카드가 없습니다.</p>`;                  
+                    else {                  
+                        cardList.forEach((card, idx) => {                  
+                            const row = document.createElement("div");                  
+                            if (editState.mode === 'MEMORIZE' && editState.index === idx) {                  
+                                row.className = "border p-2.5 rounded bg-neutral-500/5 space-y-2 text-inherit";                  
+                                row.innerHTML = `                  
+                                    <div class="grid grid-cols-2 gap-2">                  
+                                        <input type="text" id="edit-mem-front-${idx}" value="${escapeHtml(card.front)}" class="app-input w-full border p-1.5 text-xs rounded focus:outline-none">                  
+                                        <input type="text" id="edit-mem-back-${idx}" value="${escapeHtml(card.back)}" class="app-input w-full border p-1.5 text-xs rounded focus:outline-none">                  
+                                    </div>                  
+                                    <div class="flex gap-1 justify-end">                  
+                                        <button onclick="saveEditCard('MEMORIZE', ${idx})" class="app-modal-btn-confirm text-[11px] px-2.5 py-1 rounded">저장</button>                  
+                                        <button onclick="cancelEditCard(); renderDataEditTab();" class="app-modal-btn-cancel text-[11px] px-2.5 py-1 rounded bg-inherit">취소</button>                  
+                                    </div>                  
+                                `;                  
+                            } else {                  
+                                row.className = "flex items-center justify-between border border-neutral-200/40 p-2.5 rounded text-xs bg-white/5 hover:bg-neutral-500/5 text-inherit";                  
+                                row.innerHTML = `                  
+                                    <div class="grid grid-cols-2 gap-2 flex-grow mr-2">                  
+                                        <strong class="truncate">${escapeHtml(card.front)}</strong>                  
+                                        <span class="truncate opacity-60">${escapeHtml(card.back)}</span>                  
+                                    </div>                  
+                                    <div class="flex gap-1">                  
+                                        <button onclick="startEditCard('MEMORIZE', ${idx})" class="border px-2 py-0.5 rounded text-[11px] bg-inherit hover:opacity-80">수정</button>                  
+                                        <button onclick="deleteRow('MEMORIZE', ${idx})" class="text-red-500 border border-red-200/40 px-2 py-0.5 rounded text-[11px] hover:bg-red-500/10">삭제</button>                  
+                                    </div>                  
+                                `;                  
+                            }                  
+                            list.appendChild(row);                  
+                        });                  
+                    }                  
+                }                  
+            }                  
+            else if (currentEditingTab === "SEQUENCE") {                  
+                const list = document.getElementById("data-list-sequence"); if (list) { list.innerHTML = "";                  
+                    const seqList = set.cards.SEQUENCE || [];                  
+                    if (seqList.length === 0) list.innerHTML = `<p class="text-[11px] opacity-40 text-center py-4">등록된 카드가 없습니다.</p>`;                  
+                    else {                  
+                        seqList.forEach((c, idx) => {                  
+                            const row = document.createElement("div");                  
+                            if (editState.mode === 'SEQUENCE' && editState.index === idx) {                  
+                                row.className = "border p-2.5 rounded bg-neutral-500/5 space-y-2 text-inherit";                  
+                                row.innerHTML = `                  
+                                    <div class="space-y-1.5">                  
+                                        <input type="text" id="edit-seq-text-${idx}" value="${escapeHtml(c.text)}" class="app-input w-full border p-1.5 text-xs rounded focus:outline-none">                  
+                                        <input type="text" id="edit-seq-desc-${idx}" value="${escapeHtml(c.desc || '')}" class="app-input w-full border p-1.5 text-xs rounded focus:outline-none">                  
+                                    </div>                  
+                                    <div class="flex gap-1 justify-end">                  
+                                        <button onclick="saveEditCard('SEQUENCE', ${idx})" class="app-modal-btn-confirm text-[11px] px-2.5 py-1 rounded">저장</button>                  
+                                        <button onclick="cancelEditCard(); renderDataEditTab();" class="app-modal-btn-cancel text-[11px] px-2.5 py-1 rounded bg-inherit">취소</button>                  
+                                    </div>                  
+                                `;                  
+                            } else {                  
+                                row.className = "border border-neutral-200/40 p-3 rounded text-xs bg-white/5 hover:bg-neutral-500/5 space-y-1 text-inherit";                  
+                                row.innerHTML = `                  
+                                    <div class="flex justify-between items-center font-bold">                  
+                                        <span>#${idx+1} ${escapeHtml(c.text)}</span>                  
+                                        <div class="flex gap-1 shrink-0 font-normal">                  
+                                            <button onclick="moveSequenceEditRank(${idx}, -1)" class="px-1.5 border border-neutral-300/40 hover:bg-neutral-500/5">▲</button>                  
+                                            <button onclick="moveSequenceEditRank(${idx}, 1)" class="px-1.5 border border-neutral-300/40 hover:bg-neutral-500/5">▼</button>                  
+                                            <button onclick="startEditCard('SEQUENCE', ${idx})" class="border px-2 py-0.5 rounded text-[11px] bg-inherit hover:opacity-80 ml-1">수정</button>                  
+                                            <button onclick="deleteRow('SEQUENCE', ${idx})" class="text-red-500 border border-red-200/40 px-2 py-0.5 rounded text-[11px] hover:bg-red-500/10">삭제</button>                  
+                                        </div>                  
+                                    </div>                  
+                                    <div class="opacity-50 text-[11px] truncate">뜻/설명: ${escapeHtml(c.desc || '미입력')}</div>                  
+                                `;                  
+                            }                  
+                            list.appendChild(row);                  
+                        });                  
+                    }                  
+                }                  
+            }                  
+            else if (currentEditingTab === "CLASSIFY") {                  
+                const list = document.getElementById("data-list-classify"); if (list) { list.innerHTML = "";                  
+                    const clsList = set.cards.CLASSIFY || [];                  
+                    if (clsList.length === 0) list.innerHTML = `<p class="text-[11px] opacity-40 text-center py-4">등록된 카드가 없습니다.</p>`;                  
+                    else {                  
+                        clsList.forEach((c, idx) => {                  
+                            const row = document.createElement("div");                  
+                            if (editState.mode === 'CLASSIFY' && editState.index === idx) {                  
+                                row.className = "border p-2.5 rounded bg-neutral-500/5 space-y-2 text-inherit";                  
+                                row.innerHTML = `                  
+                                    <div class="grid grid-cols-2 gap-2">                  
+                                        <input type="text" id="edit-cls-card-${idx}" value="${escapeHtml(c.card)}" class="app-input border p-1.5 text-xs rounded focus:outline-none">                  
+                                        <input type="text" id="edit-cls-group-${idx}" value="${escapeHtml(c.group)}" class="app-input border p-1.5 text-xs rounded focus:outline-none">                  
+                                    </div>                  
+                                    <input type="text" id="edit-cls-desc-${idx}" value="${escapeHtml(c.desc || '')}" class="app-input w-full border p-1.5 text-xs rounded focus:outline-none">                  
+                                    <div class="flex gap-1 justify-end">                  
+                                        <button onclick="saveEditCard('CLASSIFY', ${idx})" class="app-modal-btn-confirm text-[11px] px-2.5 py-1 rounded">저장</button>                  
+                                        <button onclick="cancelEditCard(); renderDataEditTab();" class="app-modal-btn-cancel text-[11px] px-2.5 py-1 rounded bg-inherit">취소</button>                  
+                                    </div>                  
+                                `;                  
+                            } else {                  
+                                row.className = "border border-neutral-200/40 p-3 rounded text-xs bg-white/5 hover:bg-neutral-500/5 space-y-1.5 text-inherit";                  
+                                row.innerHTML = `                  
+                                    <div class="flex justify-between items-center">                  
+                                        <div>                  
+                                            <strong>${escapeHtml(c.card)}</strong>                   
+                                            <span class="opacity-50 font-medium ml-1.5">[${escapeHtml(c.group)}]</span>                  
+                                        </div>                  
+                                        <div class="flex gap-1">                  
+                                            <button onclick="startEditCard('CLASSIFY', ${idx})" class="border px-2 py-0.5 rounded text-[11px] bg-inherit hover:opacity-80">수정</button>                  
+                                            <button onclick="deleteRow('CLASSIFY', ${idx})" class="text-red-500 border border-red-200/40 px-2 py-0.5 rounded text-[11px] hover:bg-red-500/10">삭제</button>                  
+                                        </div>                  
+                                    </div>                  
+                                    <div class="text-[11px] opacity-60 truncate">${escapeHtml(c.desc)}</div>                  
+                                `;                  
+                            }                  
+                            list.appendChild(row);                  
+                        });                  
+                    }                  
+                }                  
+            }                  
+        }                  
+                          
+        function deleteRow(mode, idx) { findSetById(selectedSetId).cards[mode].splice(idx, 1); saveToLocalStorage(); renderDataEditTab(); }                  
+                          
+        function addMemorizeCardRow() {                  
+            const f = document.getElementById("add-mem-front"); const b = document.getElementById("add-mem-back");                  
+            if(!f.value.trim() || !b.value.trim()) return;                  
+            findSetById(selectedSetId).cards.MEMORIZE.push({ front: f.value.trim(), back: b.value.trim() });                  
+            saveToLocalStorage(); f.value = ""; b.value = ""; renderDataEditTab();                  
+        }                  
+        function addSequenceRow() {                  
+            const t = document.getElementById("add-seq-text"); const d = document.getElementById("add-seq-desc");                  
+            if(!t.value.trim()) return;                  
+            findSetById(selectedSetId).cards.SEQUENCE.push({ text: t.value.trim(), desc: d.value.trim() });                  
+            saveToLocalStorage(); t.value = ""; d.value = ""; renderDataEditTab();                  
+        }                  
+        function addClassifyRow() {                  
+            const c = document.getElementById("add-cls-card"); const g = document.getElementById("add-cls-group"); const d = document.getElementById("add-cls-desc");                  
+            if(!c.value.trim() || !g.value.trim()) return;                  
+            findSetById(selectedSetId).cards.CLASSIFY.push({ card: c.value.trim(), group: g.value.trim(), desc: d.value.trim() });                  
+            saveToLocalStorage(); c.value = ""; g.value = ""; d.value = ""; renderDataEditTab();                  
+        }                  
+                          
+        function moveSequenceEditRank(index, direction) {                  
+            const set = findSetById(selectedSetId); if (!set) return;                  
+            const tIdx = index + direction;                  
+            if (tIdx < 0 || tIdx >= set.cards.SEQUENCE.length) return;                  
+            const temp = set.cards.SEQUENCE[index]; set.cards.SEQUENCE[index] = set.cards.SEQUENCE[tIdx]; set.cards.SEQUENCE[tIdx] = temp;                  
+            saveToLocalStorage(); renderDataEditTab();                  
+        }  
+  
+
+        // ==================== Firebase 계정/클라우드 저장 ====================
+        function toggleAccountModal() {
+            const modal = document.getElementById("modal-account");
+            if (!modal) return;
+            modal.classList.toggle("hidden");
+            updateFirebaseUI();
+        }
+        function updateFirebaseUI() {
+            const state = window.firebaseMemoREState?.() || { ready:false, user:null };
+            const out = document.getElementById("account-logged-out");
+            const inn = document.getElementById("account-logged-in");
+            const email = document.getElementById("account-user-email");
+            const status = document.getElementById("firebase-status");
+            const btn = document.getElementById("account-main-btn");
+            if (out) out.classList.toggle("hidden", !!state.user);
+            if (inn) inn.classList.toggle("hidden", !state.user);
+            if (email && state.user) email.textContent = state.user.email || "로그인됨";
+            if (status) status.textContent = !state.ready ? "Firebase 연결 필요" : (state.user ? "클라우드 연결됨" : "로그인되지 않음");
+            if (btn) btn.textContent = state.user ? "계정" : "로그인";
+        }
+        async function firebaseSignUp() {
+            try {
+                const email = document.getElementById("account-email").value.trim();
+                const password = document.getElementById("account-password").value;
+                if (!email || password.length < 6) throw new Error("이메일과 6자 이상 비밀번호를 입력하세요.");
+                if (!window.firebaseMemoRE?.signUp) throw new Error("Firebase API 키가 설정되지 않았습니다.");
+                await window.firebaseMemoRE.signUp(email, password);
+                await saveToFirebase();
+            } catch(e) { customAlert(e.message || "계정 생성에 실패했습니다."); }
+        }
+        async function firebaseSignIn() {
+            try {
+                const email = document.getElementById("account-email").value.trim();
+                const password = document.getElementById("account-password").value;
+                if (!window.firebaseMemoRE?.signIn) throw new Error("Firebase API 키가 설정되지 않았습니다.");
+                await window.firebaseMemoRE.signIn(email, password);
+                customAlert("로그인되었습니다.");
+            } catch(e) { customAlert(e.message || "로그인에 실패했습니다."); }
+        }
+        async function firebaseSignOut() {
+            try { await window.firebaseMemoRE?.signOut(); customAlert("로그아웃되었습니다."); } catch(e) { customAlert(e.message || "로그아웃에 실패했습니다."); }
+        }
+        async function saveToFirebase() {
+            try {
+                if (!window.firebaseMemoRE?.getUser?.()) throw new Error("먼저 로그인하세요.");
+                // 로컬 데이터를 먼저 저장해 기존 데이터가 사라지는 것을 방지한다.
+                window.appData = appData; window.studySessions = studySessions;
+                saveToLocalStorage(); saveSessionsToLocalStorage();
+                await window.firebaseMemoRE.save();
+                setSyncStatusIndicator("pulse");
+                customAlert("저장되었습니다.");
+            } catch(e) { customAlert(e.message || "서버 저장에 실패했습니다."); }
+        }
+        async function loadFromFirebase() {
+            try {
+                if (!window.firebaseMemoRE?.getUser?.()) throw new Error("먼저 로그인하세요.");
+                const remote = await window.firebaseMemoRE.load();
+                if (!remote?.appData?.folders) { await saveToFirebase(); return; }
+                // 원본 로컬 데이터를 즉시 지우지 않고, ID 기준으로 없는 데이터만 병합한다.
+                const remoteFolders = Array.isArray(remote.appData.folders) ? remote.appData.folders : [];
+                remoteFolders.forEach(rf => {
+                    const lf = appData.folders.find(f => String(f.id) === String(rf.id));
+                    if (!lf) appData.folders.push(rf);
+                    else (rf.sets || []).forEach(rs => {
+                        lf.sets = lf.sets || [];
+                        if (!lf.sets.some(ls => String(ls.id) === String(rs.id))) lf.sets.push(rs);
+                    });
+                });
+                Object.assign(studySessions, remote.studySessions || {});
+                saveToLocalStorage(); saveSessionsToLocalStorage();
+                renderHome();
+                setSyncStatusIndicator("pulse");
+                customAlert("서버 데이터를 추가했습니다.");
+            } catch(e) { customAlert(e.message || "서버 불러오기에 실패했습니다."); }
+        }
+
+        // ==================== [E] 동기화 및 백업 코어 ====================  
+  
+        function toggleSyncModal() {
+            const modal = document.getElementById("modal-sync");
+            if (modal) {
+                modal.classList.toggle("hidden");
+                if (!modal.classList.contains("hidden")) {
+                    updateSyncTargetUI();
+                    updateRawSyncTextArea();
+                }
+            }
+        }
+
+        function updateSyncTargetUI() {
+            const scope = document.getElementById("sync-scope")?.value || "all";
+            const target = document.getElementById("sync-target");
+            if (!target) return;
+            if (scope === "all") { target.classList.add("hidden"); return; }
+            target.classList.remove("hidden");
+            target.innerHTML = "";
+            if (scope === "folder") {
+                appData.folders.forEach(f => target.add(new Option(f.name, f.id)));
+                if (selectedFolderId) target.value = selectedFolderId;
+            } else {
+                appData.folders.forEach(f => (f.sets || []).forEach(s => target.add(new Option(`${f.name} / ${s.name}`, s.id))));
+                if (selectedSetId) target.value = selectedSetId;
+            }
+        }
+
+        function getSyncPackage() {
+            const scope = document.getElementById("sync-scope")?.value || "all";
+            const targetId = document.getElementById("sync-target")?.value || null;
+            const pkg = { app: "memoRE", format: 2, scope, exportedAt: Date.now(), data: null, sessions: {} };
+
+            if (scope === "all") {
+                pkg.data = appData;
+                pkg.sessions = studySessions;
+            } else if (scope === "folder") {
+                const folder = appData.folders.find(f => String(f.id) === String(targetId));
+                if (!folder) throw new Error("folder not found");
+                pkg.data = { folder };
+                Object.keys(studySessions).forEach(k => {
+                    if (folder.sets.some(s => k.startsWith(`${s.id}_`))) pkg.sessions[k] = studySessions[k];
+                });
+            } else {
+                let set = null;
+                for (const f of appData.folders) set = (f.sets || []).find(s => String(s.id) === String(targetId)) || set;
+                if (!set) throw new Error("set not found");
+                pkg.data = { set };
+                Object.keys(studySessions).forEach(k => { if (k.startsWith(`${set.id}_`)) pkg.sessions[k] = studySessions[k]; });
+            }
+            return pkg;
+        }
+
+        function updateRawSyncTextArea() {
+            const textarea = document.getElementById("sync-raw-textarea");
+            if (!textarea) return;
+            try { textarea.value = LZString.compressToBase64(JSON.stringify(getSyncPackage())); }
+            catch(e) { textarea.value = ""; }
+        }
+
+        function copyRawTextSyncData() {
+            const textarea = document.getElementById("sync-raw-textarea");
+            if (!textarea) return;
+            updateRawSyncTextArea();
+            textarea.select();
+            document.execCommand("copy");
+            customAlert("선택한 데이터가 클립보드에 복사되었습니다.");
+            setSyncStatusIndicator("pulse");
+        }
+
+        function mergeImportedData(pkg) {
+            const scope = pkg.scope || "all";
+            const data = pkg.data;
+            if (!data) throw new Error("missing data");
+
+            if (scope === "set" && data.set) {
+                let target = null;
+                for (const f of appData.folders) target = (f.sets || []).find(s => String(s.id) === String(data.set.id)) || target;
+                if (target) Object.assign(target, data.set);
+                else {
+                    // 대상 폴더가 없으면 새 폴더에 넣지 않고, 가져온 파일을 별도 폴더에 안전하게 추가
+                    const newFolder = { id: `folder_import_${Date.now()}`, name: "가져온 파일", sets: [data.set] };
+                    appData.folders.push(newFolder);
+                }
+            } else if (scope === "folder" && data.folder) {
+                const idx = appData.folders.findIndex(f => String(f.id) === String(data.folder.id));
+                if (idx >= 0) appData.folders[idx] = data.folder;
+                else appData.folders.push(data.folder);
+            } else if (scope === "all" && Array.isArray(data.folders)) {
+                data.folders.forEach(importedFolder => {
+                    const idx = appData.folders.findIndex(f => String(f.id) === String(importedFolder.id));
+                    if (idx >= 0) {
+                        const existing = appData.folders[idx];
+                        existing.name = importedFolder.name;
+                        (importedFolder.sets || []).forEach(importedSet => {
+                            const si = (existing.sets || []).findIndex(s => String(s.id) === String(importedSet.id));
+                            if (si >= 0) existing.sets[si] = importedSet; else existing.sets.push(importedSet);
+                        });
+                    } else appData.folders.push(importedFolder);
+                });
+            } else throw new Error("unsupported package");
+
+            Object.assign(studySessions, pkg.sessions || {});
+            saveToLocalStorage();
+            saveSessionsToLocalStorage();
+        }
+
+        function applyRawTextSyncData() {
+            const textarea = document.getElementById("sync-raw-textarea");
+            if (!textarea) return;
+            const rawVal = textarea.value.trim();
+            if (!rawVal) { customAlert("가져올 데이터 텍스트가 입력되지 않았습니다."); return; }
+            try {
+                const decoded = JSON.parse(LZString.decompressFromBase64(rawVal));
+                if (!decoded || decoded.app !== "memoRE" || !decoded.data) throw new Error("invalid");
+                mergeImportedData(decoded);
+                customAlert("선택한 데이터가 이 기기에 안전하게 적용되었습니다.");
+                renderHome(); goHome(); toggleSyncModal(); setSyncStatusIndicator("pulse");
+            } catch(e) {
+                customAlert("⚠️ 올바른 memoRE 동기화 코드가 아닙니다.");
+            }
+        }
+
+        // ==================== 이름 변경 ====================
+        let renameTargetType = null;
+        function openRenameModal(type) {
+            renameTargetType = type;
+            const target = type === "folder" ? appData.folders.find(f => String(f.id) === String(selectedFolderId)) : findSetById(selectedSetId);
+            if (!target) return;
+            document.getElementById("rename-title").innerText = type === "folder" ? "폴더 이름 변경" : "묶음 이름 변경";
+            document.getElementById("rename-input").value = target.name || "";
+            document.getElementById("modal-rename").classList.remove("hidden");
+            setTimeout(() => document.getElementById("rename-input")?.focus(), 50);
+        }
+        function closeRenameModal() { document.getElementById("modal-rename")?.classList.add("hidden"); }
+        function saveRename() {
+            const name = document.getElementById("rename-input")?.value.trim();
+            if (!name) return;
+            const target = renameTargetType === "folder" ? appData.folders.find(f => String(f.id) === String(selectedFolderId)) : findSetById(selectedSetId);
+            if (!target) return;
+            target.name = name;
+            saveToLocalStorage();
+            if (renameTargetType === "folder") renderFolderDetail(selectedFolderId); else renderSetDetail(selectedSetId);
+            closeRenameModal();
+        }
+
+        function escapeHtml(s) {                   
+            if (s === null || s === undefined) return "";                  
+            return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");                   
+        }                  
+        function customAlert(m) {                  
+            const toast = document.createElement("div");                  
+            toast.className = "fixed bottom-5 left-1/2 -translate-x-1/2 bg-neutral-900 text-white dark:bg-neutral-100 dark:text-neutral-900 text-xs px-5 py-2.5 rounded shadow-lg z-[9999] text-center w-80 pointer-events-none transition-all";                  
+            toast.innerText = m; document.body.appendChild(toast);                  
+            setTimeout(() => { toast.classList.add("opacity-0", "transition-opacity", "duration-500"); setTimeout(() => toast.remove(), 500); }, 2000);                  
+        }  
+    </script>  
+    <script>  
+if ('serviceWorker' in navigator) {  
+  navigator.serviceWorker.register('./sw.js');  
+}  
+</script>  
+<script src="https://cdnjs.cloudflare.com/ajax/libs/lz-string/1.4.4/lz-string.min.js"></script>  
+
+    <div id="modal-account" class="hidden fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+        <div class="app-modal-content border w-full max-w-xs p-5 rounded-2xl space-y-4 text-inherit">
+            <div class="flex justify-between items-center">
+                <h3 class="text-sm font-bold">계정</h3>
+                <button onclick="toggleAccountModal()" class="opacity-40 hover:opacity-100 text-lg">×</button>
+            </div>
+            <div id="account-logged-out" class="space-y-2">
+                <input id="account-email" type="email" autocomplete="email" placeholder="이메일" class="app-input w-full border p-2.5 text-xs rounded-xl">
+                <input id="account-password" type="password" autocomplete="current-password" placeholder="비밀번호" class="app-input w-full border p-2.5 text-xs rounded-xl">
+                <div class="grid grid-cols-2 gap-2">
+                    <button onclick="firebaseSignIn()" class="bg-neutral-950 text-white py-2.5 rounded-xl text-xs font-bold">로그인</button>
+                    <button onclick="firebaseSignUp()" class="border border-neutral-300 py-2.5 rounded-xl text-xs font-bold">계정 생성</button>
+                </div>
+            </div>
+            <div id="account-logged-in" class="hidden space-y-3">
+                <p id="account-user-email" class="text-xs opacity-60 break-all"></p>
+                <div class="grid grid-cols-2 gap-2">
+                    <button onclick="saveToFirebase()" class="bg-neutral-950 text-white py-2.5 rounded-xl text-xs font-bold">서버에 저장</button>
+                    <button onclick="loadFromFirebase()" class="border border-neutral-300 py-2.5 rounded-xl text-xs font-bold">서버 불러오기</button>
+                </div>
+                <button onclick="firebaseSignOut()" class="w-full border border-red-200 text-red-500 py-2.5 rounded-xl text-xs">로그아웃</button>
+            </div>
+            <p id="firebase-status" class="text-[10px] opacity-45"></p>
+        </div>
+    </div>
+
+</body>  
+</html>  
